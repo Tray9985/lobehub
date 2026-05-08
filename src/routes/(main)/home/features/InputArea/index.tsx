@@ -17,7 +17,6 @@ import {
 
 import BotIntegrationBanner, { BOT_INTEGRATION_BANNER_ID } from './BotIntegrationBanner';
 import SkillInstallBanner, { SKILL_INSTALL_BANNER_ID } from './SkillInstallBanner';
-import StarterList from './StarterList';
 import { useSend } from './useSend';
 
 const leftActions: ActionKeys[] = ['model', 'search', 'fileUpload', 'tools'];
@@ -137,8 +136,6 @@ const InputArea = () => {
           </ChatInputProvider>
         </DragUploadZone>
       </Flexbox>
-
-      <StarterList />
     </Flexbox>
   );
 };

@@ -39,3 +39,19 @@
 **动机**：类似 ChatGPT 登录页，希望首页内容在垂直方向居中，而不是偏向上方。
 
 **决策**：外层容器添加垂直 flex 居中，移除原 `paddingBlock` 偏移量。
+
+### 6. 移除首页 StarterList 快速入口按钮
+
+**动机**：三个按钮（DeepSeek V4 Pro、图片生成、视频生成）依赖 LobeHub 云服务提供的特定模型，个人自用没有这些模型，按钮无实际功能。
+
+**决策**：从 InputArea 组件中删除 StarterList 引用和渲染。图片/视频生成仍可通过直接 URL 访问。
+
+**合并指导**：上游对 StarterList 的任何更新不需要采纳。
+
+### 7. 修复 Docker 构建中 pnpm init 兼容性问题
+
+**动机**：`pnpm init` 自动生成 `devEngines` 字段导致后续 `pnpm add` 因 semver 校验失败。
+
+**决策**：用 `printf '{"private":true}' > package.json` 手工创建最小 manifest，绕过 pnpm init 的副作用。
+
+**合并指导**：上游 Dockerfile 此处的任何修改优先保留本地方案。
