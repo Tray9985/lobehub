@@ -12,6 +12,7 @@ export interface AIProviderState {
   activeAiProvider?: string;
   activeProviderModelList: any[];
   aiProviderConfigUpdatingIds: string[];
+  aiProviderConfigUpdatingKeys: string[];
   /**
    * Map of provider id to provider detail, used for caching provider details
    * to avoid data inconsistency when switching providers
@@ -34,6 +35,7 @@ export interface AIProviderState {
 export const initialAIProviderState: AIProviderState = {
   activeProviderModelList: [],
   aiProviderConfigUpdatingIds: [],
+  aiProviderConfigUpdatingKeys: [],
   aiProviderDetailMap: {},
   aiProviderList: [],
   aiProviderLoadingIds: [],

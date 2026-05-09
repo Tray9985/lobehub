@@ -42,6 +42,14 @@ import UpdateProviderInfo from './UpdateProviderInfo';
 
 const prefixCls = 'ant';
 
+const ProviderConfigField = {
+  ApiKey: 'keyVaults.apiKey',
+  BaseURL: 'keyVaults.baseURL',
+  CheckModel: 'checkModel',
+  FetchOnClient: 'fetchOnClient',
+  ResponsesApi: 'config.enableResponseApi',
+} as const;
+
 const styles = createStaticStyles(({ css, cssVar }) => ({
   aceGcm: css`
     padding-block: 0 !important;
@@ -161,14 +169,20 @@ const ProviderConfig = memo<ProviderConfigProps>(
       updateAiProviderConfig,
       enabled,
       isLoading,
-      configUpdating,
+      isApiKeyUpdating,
+      isBaseURLUpdating,
+      isFetchOnClientUpdating,
+      isResponsesApiUpdating,
       providerRuntimeConfig,
     ] = useAiInfraStore((s) => [
       aiProviderSelectors.providerDetailById(id)(s),
       s.updateAiProviderConfig,
       aiProviderSelectors.isProviderEnabled(id)(s),
       aiProviderSelectors.isAiProviderConfigLoading(id)(s),
-      aiProviderSelectors.isProviderConfigUpdating(id)(s),
+      aiProviderSelectors.isProviderConfigFieldUpdating(id, ProviderConfigField.ApiKey)(s),
+      aiProviderSelectors.isProviderConfigFieldUpdating(id, ProviderConfigField.BaseURL)(s),
+      aiProviderSelectors.isProviderConfigFieldUpdating(id, ProviderConfigField.FetchOnClient)(s),
+      aiProviderSelectors.isProviderConfigFieldUpdating(id, ProviderConfigField.ResponsesApi)(s),
       aiProviderSelectors.providerConfigById(id)(s),
     ]);
     const enableBusinessFeatures = useServerConfigStore(
@@ -236,14 +250,37 @@ const ProviderConfig = memo<ProviderConfigProps>(
     const isCheckingConnection = useRef(false);
 
     const handleValueChange = useCallback(
-      (...params: Parameters<typeof updateAiProviderConfig>) => {
+      (
+        providerId: string,
+        value: Parameters<typeof updateAiProviderConfig>[1],
+        changedValue: Parameters<typeof updateAiProviderConfig>[1],
+      ) => {
         // Although debouncedHandleValueChange executes before onBeforeCheck,
         // due to the debounce, debouncedHandleValueChange will actually execute 500ms later
         // so isCheckingConnection.current has already been updated at this point
         // updateAiProviderConfig has already been triggered once during the connection test, so it should not be updated again
         if (isCheckingConnection.current) return;
 
-        updateAiProviderConfig(...params);
+        const updatingFields: string[] = [];
+        const changedKeyVaults = changedValue.keyVaults;
+
+        if (changedKeyVaults?.baseURL !== undefined || changedKeyVaults?.endpoint !== undefined) {
+          updatingFields.push(ProviderConfigField.BaseURL);
+        }
+
+        if (
+          changedKeyVaults &&
+          Object.keys(changedKeyVaults).some((key) => key !== 'baseURL' && key !== 'endpoint')
+        ) {
+          updatingFields.push(ProviderConfigField.ApiKey);
+        }
+
+        if (changedValue.fetchOnClient !== undefined)
+          updatingFields.push(ProviderConfigField.FetchOnClient);
+        if (changedValue.config?.enableResponseApi !== undefined)
+          updatingFields.push(ProviderConfigField.ResponsesApi);
+
+        updateAiProviderConfig(providerId, value, { updatingFields });
       },
       [updateAiProviderConfig],
     );
@@ -273,7 +310,7 @@ const ProviderConfig = memo<ProviderConfigProps>(
                   autoComplete={'new-password'}
                   placeholder={t('providerModels.config.apiKey.placeholder', { name })}
                   suffix={
-                    configUpdating && (
+                    isApiKeyUpdating && (
                       <Icon spin icon={Loader2Icon} style={{ color: cssVar.colorTextTertiary }} />
                     )
                   }
@@ -337,7 +374,7 @@ const ProviderConfig = memo<ProviderConfigProps>(
                 t('providerModels.config.baseURL.placeholder')
               }
               suffix={
-                configUpdating && (
+                isBaseURLUpdating && (
                   <Icon spin icon={Loader2Icon} style={{ color: cssVar.colorTextTertiary }} />
                 )
               }
@@ -375,7 +412,7 @@ const ProviderConfig = memo<ProviderConfigProps>(
 
     const clientFetchItem = showClientFetch
       ? {
-          children: isLoading ? <SkeletonSwitch /> : <Switch loading={configUpdating} />,
+          children: isLoading ? <SkeletonSwitch /> : <Switch loading={isFetchOnClientUpdating} />,
           desc: t('providerModels.config.fetchOnClient.desc'),
           label: t('providerModels.config.fetchOnClient.title'),
           minWidth: undefined,
@@ -391,7 +428,11 @@ const ProviderConfig = memo<ProviderConfigProps>(
       endpointItem,
       showResponsesApiSwitch
         ? {
-            children: isLoading ? <Skeleton.Button active /> : <Switch loading={configUpdating} />,
+            children: isLoading ? (
+              <Skeleton.Button active />
+            ) : (
+              <Switch loading={isResponsesApiUpdating} />
+            ),
             desc: t('providerModels.config.responsesApi.desc'),
             label: t('providerModels.config.responsesApi.title'),
             minWidth: undefined,
@@ -507,8 +548,8 @@ const ProviderConfig = memo<ProviderConfigProps>(
             form={form}
             items={[model]}
             variant={'borderless'}
-            onValuesChange={(_, values) => {
-              debouncedHandleValueChange(id, values);
+            onValuesChange={(changedValue, values) => {
+              debouncedHandleValueChange(id, values, changedValue);
             }}
             {...FORM_STYLE}
           />

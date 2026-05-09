@@ -21,6 +21,8 @@ const styles = createStaticStyles(({ css }) => ({
     width: 380px;
   `,
 }));
+
+const CheckModelUpdatingField = 'checkModel';
 const Error = memo<{ error: ChatMessageError }>(({ error }) => {
   const { t } = useTranslation('error');
   const providerName = useProviderName(error.body?.provider);
@@ -67,7 +69,7 @@ const Checker = memo<ConnectionCheckerProps>(
     const { t } = useTranslation('setting');
 
     const [isProviderConfigUpdating, updateAiProviderConfig] = useAiInfraStore((s) => [
-      aiProviderSelectors.isProviderConfigUpdating(provider)(s),
+      aiProviderSelectors.isProviderConfigFieldUpdating(provider, CheckModelUpdatingField)(s),
       s.updateAiProviderConfig,
     ]);
     const aiProviderModelList = useAiInfraStore((s) => s.aiProviderModelList);
@@ -198,7 +200,13 @@ const Checker = memo<ConnectionCheckerProps>(
 
               // Persist the selected model to provider config
               // This allows the model to be retained after page refresh
-              await updateAiProviderConfig(provider, { checkModel: value });
+              await updateAiProviderConfig(
+                provider,
+                { checkModel: value },
+                {
+                  updatingFields: [CheckModelUpdatingField],
+                },
+              );
             }}
           />
           <Button

@@ -242,6 +242,12 @@ type AiProviderRuntimeStateWithBuiltinModels = AiProviderRuntimeState & {
 };
 
 type Setter = StoreSetter<AiInfraStore>;
+type UpdateAiProviderConfigOptions = {
+  updatingFields?: string[];
+};
+
+const getProviderConfigUpdatingKey = (id: string, field: string) => `${id}:${field}`;
+
 export const createAiProviderSlice = (set: Setter, get: () => AiInfraStore, _api?: unknown) =>
   new AiProviderActionImpl(set, get, _api);
 
@@ -269,8 +275,13 @@ export class AiProviderActionImpl {
   internal_toggleAiProviderConfigUpdating = (id: string, loading: boolean): void => {
     this.#set(
       (state) => {
-        if (loading)
-          return { aiProviderConfigUpdatingIds: [...state.aiProviderConfigUpdatingIds, id] };
+        if (loading) {
+          return {
+            aiProviderConfigUpdatingIds: Array.from(
+              new Set([...state.aiProviderConfigUpdatingIds, id]),
+            ),
+          };
+        }
 
         return {
           aiProviderConfigUpdatingIds: state.aiProviderConfigUpdatingIds.filter((i) => i !== id),
@@ -278,6 +289,37 @@ export class AiProviderActionImpl {
       },
       false,
       'toggleAiProviderLoading',
+    );
+  };
+
+  internal_toggleAiProviderConfigFieldUpdating = (
+    id: string,
+    fields: string[] | undefined,
+    loading: boolean,
+  ): void => {
+    if (!fields?.length) return;
+
+    const keys = fields.map((field) => getProviderConfigUpdatingKey(id, field));
+
+    this.#set(
+      (state) => {
+        if (loading) {
+          return {
+            aiProviderConfigUpdatingKeys: Array.from(
+              new Set([...state.aiProviderConfigUpdatingKeys, ...keys]),
+            ),
+          };
+        }
+
+        const keySet = new Set(keys);
+        return {
+          aiProviderConfigUpdatingKeys: state.aiProviderConfigUpdatingKeys.filter(
+            (key) => !keySet.has(key),
+          ),
+        };
+      },
+      false,
+      'toggleAiProviderConfigFieldUpdating',
     );
   };
 
@@ -348,67 +390,74 @@ export class AiProviderActionImpl {
   updateAiProviderConfig = async (
     id: string,
     value: UpdateAiProviderConfigParams,
+    options?: UpdateAiProviderConfigOptions,
   ): Promise<void> => {
     this.#get().internal_toggleAiProviderConfigUpdating(id, true);
-    await aiProviderService.updateAiProviderConfig(id, value);
+    this.#get().internal_toggleAiProviderConfigFieldUpdating(id, options?.updatingFields, true);
 
-    // Immediately update local state for instant UI feedback
-    this.#set(
-      (state) => {
-        const currentRuntimeConfig = state.aiProviderRuntimeConfig[id];
-        const currentDetailConfig = state.aiProviderDetailMap[id];
+    try {
+      await aiProviderService.updateAiProviderConfig(id, value);
 
-        const updates: Partial<typeof currentRuntimeConfig> = {};
-        const detailUpdates: Partial<typeof currentDetailConfig> = {};
+      // Immediately update local state for instant UI feedback
+      this.#set(
+        (state) => {
+          const currentRuntimeConfig = state.aiProviderRuntimeConfig[id];
+          const currentDetailConfig = state.aiProviderDetailMap[id];
 
-        // Update fetchOnClient if changed
-        if (typeof value.fetchOnClient !== 'undefined') {
-          // Convert null to undefined to match the interface definition
-          const fetchOnClientValue = value.fetchOnClient === null ? undefined : value.fetchOnClient;
-          updates.fetchOnClient = fetchOnClientValue;
-          detailUpdates.fetchOnClient = fetchOnClientValue;
-        }
+          const updates: Partial<typeof currentRuntimeConfig> = {};
+          const detailUpdates: Partial<typeof currentDetailConfig> = {};
 
-        // Update config.enableResponseApi if changed
-        if (value.config?.enableResponseApi !== undefined && currentRuntimeConfig?.config) {
-          updates.config = {
-            ...currentRuntimeConfig.config,
-            enableResponseApi: value.config.enableResponseApi,
+          // Update fetchOnClient if changed
+          if (typeof value.fetchOnClient !== 'undefined') {
+            // Convert null to undefined to match the interface definition
+            const fetchOnClientValue =
+              value.fetchOnClient === null ? undefined : value.fetchOnClient;
+            updates.fetchOnClient = fetchOnClientValue;
+            detailUpdates.fetchOnClient = fetchOnClientValue;
+          }
+
+          // Update config.enableResponseApi if changed
+          if (value.config?.enableResponseApi !== undefined && currentRuntimeConfig?.config) {
+            updates.config = {
+              ...currentRuntimeConfig.config,
+              enableResponseApi: value.config.enableResponseApi,
+            };
+          }
+
+          return {
+            // Update detail map for form display
+            aiProviderDetailMap:
+              currentDetailConfig && Object.keys(detailUpdates).length > 0
+                ? {
+                    ...state.aiProviderDetailMap,
+                    [id]: {
+                      ...currentDetailConfig,
+                      ...detailUpdates,
+                    },
+                  }
+                : state.aiProviderDetailMap,
+            // Update runtime config for selectors
+            aiProviderRuntimeConfig:
+              currentRuntimeConfig && Object.keys(updates).length > 0
+                ? {
+                    ...state.aiProviderRuntimeConfig,
+                    [id]: {
+                      ...currentRuntimeConfig,
+                      ...updates,
+                    },
+                  }
+                : state.aiProviderRuntimeConfig,
           };
-        }
+        },
+        false,
+        'updateAiProviderConfig/syncChanges',
+      );
 
-        return {
-          // Update detail map for form display
-          aiProviderDetailMap:
-            currentDetailConfig && Object.keys(detailUpdates).length > 0
-              ? {
-                  ...state.aiProviderDetailMap,
-                  [id]: {
-                    ...currentDetailConfig,
-                    ...detailUpdates,
-                  },
-                }
-              : state.aiProviderDetailMap,
-          // Update runtime config for selectors
-          aiProviderRuntimeConfig:
-            currentRuntimeConfig && Object.keys(updates).length > 0
-              ? {
-                  ...state.aiProviderRuntimeConfig,
-                  [id]: {
-                    ...currentRuntimeConfig,
-                    ...updates,
-                  },
-                }
-              : state.aiProviderRuntimeConfig,
-        };
-      },
-      false,
-      'updateAiProviderConfig/syncChanges',
-    );
-
-    await this.#get().refreshAiProviderDetail();
-
-    this.#get().internal_toggleAiProviderConfigUpdating(id, false);
+      await this.#get().refreshAiProviderDetail();
+    } finally {
+      this.#get().internal_toggleAiProviderConfigFieldUpdating(id, options?.updatingFields, false);
+      this.#get().internal_toggleAiProviderConfigUpdating(id, false);
+    }
   };
 
   updateAiProviderSort = async (items: AiProviderSortMap[]): Promise<void> => {
