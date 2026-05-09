@@ -36,13 +36,12 @@ describe('UserUpdater', () => {
   });
 
   it('preserves user fields populated by useInitUserState (e.g. interests) when better-auth re-emits the session on tab focus', () => {
-    // Simulate the post-init state: useInitUserState has loaded interests etc.
     useUserStore.setState({
       user: {
         id: 'u1',
         email: 'a@b.com',
-        fullName: 'Alice',
-        username: 'alice',
+        fullName: 'CATNET',
+        username: 'catnet',
         interests: ['内容创作', '编程'],
         firstName: 'A',
         latestName: 'lice',
@@ -66,6 +65,50 @@ describe('UserUpdater', () => {
     expect(useUserStore.getState().user?.interests).toEqual(['内容创作', '编程']);
     expect(useUserStore.getState().user?.firstName).toBe('A');
     expect(useUserStore.getState().user?.latestName).toBe('lice');
+  });
+
+  it('preserves fullName and username from store when session returns stale values', () => {
+    // Simulate: user updated fullName/username via LobeHub profile settings
+    // to "CATNET", but the Better-Auth session cookie still carries the old
+    // login-time values ("admin").
+    useUserStore.setState({
+      user: {
+        id: 'u1',
+        email: 'a@b.com',
+        fullName: 'CATNET',
+        username: 'CATNET',
+        interests: ['内容创作', '编程'],
+        avatar: 'avatar-url',
+      },
+    });
+
+    // Session returns stale name / username — should be ignored
+    useSessionMock.mockReturnValue(sampleSession({ name: 'admin', username: null }));
+    render(<UserUpdater />);
+
+    const user = useUserStore.getState().user;
+    expect(user?.fullName).toBe('CATNET');
+    expect(user?.username).toBe('CATNET');
+    expect(user?.interests).toEqual(['内容创作', '编程']);
+    expect(user?.avatar).toBe('avatar-url');
+  });
+
+  it('falls back to session values when store has no fullName/username yet', () => {
+    // Simulate: fresh login, useInitUserState has not populated profile fields yet
+    useUserStore.setState({
+      user: {
+        id: 'u1',
+        email: 'a@b.com',
+        avatar: '',
+      },
+    });
+
+    useSessionMock.mockReturnValue(sampleSession({ name: 'NewUser', username: 'newuser' }));
+    render(<UserUpdater />);
+
+    const user = useUserStore.getState().user;
+    expect(user?.fullName).toBe('NewUser');
+    expect(user?.username).toBe('newuser');
   });
 
   it('drops the previous user profile fields when the session switches to a different account', () => {
@@ -95,6 +138,8 @@ describe('UserUpdater', () => {
     const user = useUserStore.getState().user;
     expect(user?.id).toBe('userB');
     expect(user?.email).toBe('b@c.com');
+    expect(user?.fullName).toBe('Bob');
+    expect(user?.username).toBe('bob');
     expect(user?.interests).toBeUndefined();
     expect(user?.firstName).toBeUndefined();
     expect(user?.latestName).toBeUndefined();
