@@ -253,6 +253,11 @@ export class HeterogeneousPersistenceHandler {
       await this.handleEvent(state, event);
       state.processedKeys.add(key);
     }
+
+    // Flush accumulated content after every batch so a subsequent replica
+    // picking up this operation always sees the latest content in the DB,
+    // even if it never processes a step boundary or terminal event.
+    await this.flushBatchContent(state);
   }
 
   /**
@@ -324,22 +329,66 @@ export class HeterogeneousPersistenceHandler {
       throw new Error(`runningOperation on topic ${topicId} is missing assistantMessageId`);
     }
 
+    // Prefer the latest step's assistant message id (written by handleStepStart)
+    // over the initial placeholder — so a new replica after a step boundary uses
+    // the correct message rather than the stale initial one.
+    // Guard: only use heteroCurrentMsgId when it belongs to THIS operation.
+    // A stale value from a previous run must not override the new operation's
+    // seeded assistantMessageId (P1 fix).
+    const stored = topic.metadata?.heteroCurrentMsgId;
+    const currentAssistantMessageId =
+      stored?.operationId === running.operationId
+        ? (stored.msgId ?? running.assistantMessageId)
+        : running.assistantMessageId;
+
+    // Restore toolMsgIdByCallId from the DB so tool_results that arrive on a
+    // different replica than their tool_use can still be matched and persisted.
+    const toolPlugins = await this.deps.messageModel.listMessagePluginsByTopic(topicId);
+    const toolMsgIdByCallId = new Map<string, string>();
+    for (const plugin of toolPlugins) {
+      if (plugin.toolCallId) toolMsgIdByCallId.set(plugin.toolCallId, plugin.id);
+    }
+
+    // Restore in-progress accumulators and tool state from the current assistant
+    // message so a cold replica (Vercel serverless — each request is a new process)
+    // continues from where the previous request left off rather than overwriting
+    // with an empty/shorter value. Without this, every ingest call would reset
+    // accumulatedContent to '' and toolState.payloads to [], causing:
+    //   - content truncation: warm instance writes "hello world", cold instance
+    //     accumulates only " more text" and overwrites with that shorter string.
+    //   - tool duplication: cold instance sees persistedIds={}, re-creates already-
+    //     persisted tool messages, and overwrites assistant.tools[] with only the
+    //     current batch's tools (losing all previous ones).
+    const currentMsg = await this.deps.messageModel.findById(currentAssistantMessageId);
+    const restoredContent = (currentMsg?.content ?? '') as string;
+    const restoredReasoning = (currentMsg?.reasoning as { content?: string } | null)?.content ?? '';
+    const restoredTools = (currentMsg?.tools ?? []) as ChatToolPayload[];
+    const restoredPersistedIds = new Set(restoredTools.map((t) => t.id));
+
     state = {
-      accumulatedContent: '',
-      accumulatedReasoning: '',
+      accumulatedContent: restoredContent,
+      accumulatedReasoning: restoredReasoning,
       agentId: topic.agentId ?? null,
-      currentAssistantMessageId: running.assistantMessageId,
+      currentAssistantMessageId,
       lastModel: undefined,
       lastProvider: undefined,
       operationId,
       processedKeys: new Set(),
       subagentRuns: new Map(),
-      toolMsgIdByCallId: new Map(),
-      toolState: { payloads: [], persistedIds: new Set() },
+      toolMsgIdByCallId,
+      toolState: { payloads: restoredTools, persistedIds: restoredPersistedIds },
       topicId,
     };
     operationStates.set(operationId, state);
-    log('created state for operation %s on topic %s', operationId, topicId);
+    log(
+      'created state for operation %s on topic %s msgId=%s tools=%d restored(content=%d tools=%d)',
+      operationId,
+      topicId,
+      currentAssistantMessageId,
+      toolMsgIdByCallId.size,
+      restoredContent.length,
+      restoredTools.length,
+    );
     return state;
   }
 
@@ -435,8 +484,18 @@ export class HeterogeneousPersistenceHandler {
       role: 'assistant',
       topicId: state.topicId,
     });
-    state.currentAssistantMessageId = newMsg.id;
 
+    // Persist BEFORE advancing in-memory state (P2 fix). If this write fails
+    // transiently and the event is retried, state is still at the previous step
+    // so handleStepStart re-creates the new message with the correct parent
+    // rather than chaining off the partially-created one. The first attempt's
+    // empty message becomes an orphan but does not corrupt the turn chain.
+    await this.deps.topicModel.updateMetadata(state.topicId, {
+      heteroCurrentMsgId: { msgId: newMsg.id, operationId: state.operationId },
+    });
+
+    // Advance state only after the DB write lands.
+    state.currentAssistantMessageId = newMsg.id;
     state.accumulatedContent = '';
     state.accumulatedReasoning = '';
     state.toolState = { payloads: [], persistedIds: new Set() };
@@ -575,6 +634,20 @@ export class HeterogeneousPersistenceHandler {
     if (Object.keys(updateValue).length > 0) {
       await this.deps.messageModel.update(state.currentAssistantMessageId, updateValue);
     }
+  }
+
+  /**
+   * Write accumulated content/reasoning to DB after every ingest batch.
+   * This ensures a subsequent replica always finds the latest text in the DB
+   * even if the current replica never processes a step-boundary or terminal
+   * event (which are the normal flush triggers).
+   */
+  private async flushBatchContent(state: OperationState): Promise<void> {
+    if (!state.accumulatedContent && !state.accumulatedReasoning) return;
+    const update: Record<string, any> = {};
+    if (state.accumulatedContent) update.content = state.accumulatedContent;
+    if (state.accumulatedReasoning) update.reasoning = { content: state.accumulatedReasoning };
+    await this.deps.messageModel.update(state.currentAssistantMessageId, update);
   }
 
   private toChatMessageError(data: unknown): ChatMessageError {

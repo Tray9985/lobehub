@@ -35,6 +35,16 @@ If you don't have it, please run \`openssl rand -base64 32\` to create one.
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
     });
+    // pg.Pool emits 'error' on idle clients when the backend connection drops.
+    // Without a listener Node escalates it to uncaughtException and exits the process.
+    // See: https://node-postgres.com/apis/pool#error
+    client.on('error', (err) => {
+      console.error('[NodePool] idle client error (swallowed to prevent process crash):', {
+        code: (err as NodeJS.ErrnoException).code,
+        message: err.message,
+        stack: err.stack,
+      });
+    });
     return nodeDrizzle(client, { schema });
   }
 
@@ -44,5 +54,15 @@ If you don't have it, please run \`openssl rand -base64 32\` to create one.
   }
 
   const client = new NeonPool({ connectionString });
+  // NeonPool runs over WebSocket; transient drops surface as 'error' on the pool.
+  // Without a listener Node escalates it to uncaughtException — on Vercel this killed
+  // the entire Lambda 1800+ times in 5 minutes (see LOBE-8704).
+  client.on('error', (err: Error) => {
+    console.error('[NeonPool] idle client error (swallowed to prevent process crash):', {
+      code: (err as NodeJS.ErrnoException).code,
+      message: err.message,
+      stack: err.stack,
+    });
+  });
   return neonDrizzle(client, { schema });
 };

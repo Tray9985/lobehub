@@ -10,10 +10,7 @@ import { builtinAgentSelectors } from '@/store/agent/selectors/builtinAgentSelec
 import { useChatStore } from '@/store/chat';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
-import {
-  serverConfigSelectors,
-  useServerConfigStore,
-} from '@/store/serverConfig';
+import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
 
 import BotIntegrationBanner, { BOT_INTEGRATION_BANNER_ID } from './BotIntegrationBanner';
 import SkillInstallBanner, { SKILL_INSTALL_BANNER_ID } from './SkillInstallBanner';
@@ -131,6 +128,7 @@ const InputArea = () => {
             <DesktopChatInput
               dropdownPlacement="bottomLeft"
               inputContainerProps={inputContainerProps}
+              placeholder={dailyHint}
               showRuntimeConfig={false}
             />
           </ChatInputProvider>

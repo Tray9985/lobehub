@@ -229,7 +229,14 @@ export interface AIBaseModelCard {
   organization?: string;
 
   releasedAt?: string;
+  /**
+   * Whether the model should be shown in user-facing model lists.
+   * Runtime-only aliases can set this to false while staying enabled and resolvable.
+   */
+  visible?: boolean;
 }
+
+export const isAiModelVisible = (model: { visible?: boolean }) => model.visible !== false;
 
 export interface AiModelConfig {
   /**
@@ -253,6 +260,7 @@ export type ExtendParamsType =
   | 'enableAdaptiveThinking'
   | 'disableContextCaching'
   | 'effort'
+  | 'deepseekV4ReasoningEffort'
   | 'reasoningEffort'
   | 'gpt5ReasoningEffort'
   | 'gpt5_1ReasoningEffort'
@@ -260,7 +268,6 @@ export type ExtendParamsType =
   | 'gpt5_2ProReasoningEffort'
   | 'grok4_20ReasoningEffort'
   | 'hy3ReasoningEffort'
-  | 'deepseekV4ReasoningEffort'
   | 'codexMaxReasoningEffort'
   | 'opus47Effort'
   | 'textVerbosity'
@@ -312,6 +319,7 @@ export const ExtendParamsTypeSchema = z.enum([
   'enableAdaptiveThinking',
   'disableContextCaching',
   'effort',
+  'deepseekV4ReasoningEffort',
   'reasoningEffort',
   'gpt5ReasoningEffort',
   'gpt5_1ReasoningEffort',
@@ -319,7 +327,6 @@ export const ExtendParamsTypeSchema = z.enum([
   'gpt5_2ProReasoningEffort',
   'grok4_20ReasoningEffort',
   'hy3ReasoningEffort',
-  'deepseekV4ReasoningEffort',
   'codexMaxReasoningEffort',
   'opus47Effort',
   'textVerbosity',
@@ -480,6 +487,7 @@ export interface AiProviderModelListItem {
   settings?: AiModelSettings;
   source?: AiModelSourceType;
   type: AiModelType;
+  visible?: boolean;
 }
 
 // Update
@@ -554,4 +562,5 @@ export interface EnabledAiModel {
   settings?: AiModelSettings;
   sort?: number;
   type: AiModelType;
+  visible?: boolean;
 }
