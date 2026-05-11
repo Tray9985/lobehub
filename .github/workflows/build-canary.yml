@@ -3,8 +3,8 @@ name: 构建自定义镜像
 on:
   push:
     branches:
-      - custom
-  workflow_dispatch:
+      - canary
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
 
     steps:
-      - name: 检出 custom 分支
+      - name: 检出 canary 分支
         uses: actions/checkout@v6
 
       - name: 登录 ghcr.io
