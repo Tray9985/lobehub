@@ -95,6 +95,9 @@ const InputArea = () => {
     [],
   );
 
+  // Daily-generated input hint paired with the home WelcomeText. The hint
+  // tracks whichever pair the WelcomeText typewriter is currently showing,
+  // via the shared rotating index inside `useHomeDailyBrief`.
   const { currentPair } = useHomeDailyBrief();
   const dailyHint = currentPair?.hint ? stripMarkdownLinks(currentPair.hint) : undefined;
 
