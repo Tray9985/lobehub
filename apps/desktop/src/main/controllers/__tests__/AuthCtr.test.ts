@@ -80,6 +80,7 @@ vi.mock('node:crypto', () => ({
 const mockRemoteServerConfigCtr = {
   clearTokens: vi.fn().mockResolvedValue(undefined),
   getAccessToken: vi.fn().mockResolvedValue('mock-access-token'),
+  getCfHeaders: vi.fn().mockReturnValue({}),
   getLastTokenRefreshAt: vi.fn().mockReturnValue(Date.now()),
   getRemoteServerConfig: vi.fn().mockResolvedValue({ active: true, storageMode: 'cloud' }),
   getRemoteServerUrl: vi.fn().mockImplementation(async (config?: DataSyncConfig) => {
