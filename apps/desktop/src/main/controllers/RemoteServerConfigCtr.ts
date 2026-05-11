@@ -48,6 +48,10 @@ export default class RemoteServerConfigCtr extends ControllerModule {
    * Key used to store encrypted tokens in electron-store.
    */
   private readonly encryptedTokensKey = 'encryptedTokens';
+  /**
+   * Key used to store encrypted CF Service Token in electron-store.
+   */
+  private readonly encryptedCfTokensKey = 'encryptedCfTokens';
 
   /**
    * Normalize legacy config that used local storageMode.
@@ -128,8 +132,14 @@ export default class RemoteServerConfigCtr extends ControllerModule {
     const { storeManager } = this.app;
     const prev: DataSyncConfig = storeManager.get('dataSyncConfig');
 
+    // Extract and securely store CF Service Token (strip from persistent config)
+    const { cfAccessClientId, cfAccessClientSecret, ...configWithoutCf } = config;
+    if (cfAccessClientId && cfAccessClientSecret) {
+      this.saveCfTokens(cfAccessClientId, cfAccessClientSecret);
+    }
+
     // Save configuration with legacy local storage fallback
-    const merged = this.normalizeConfig({ ...prev, ...config });
+    const merged = this.normalizeConfig({ ...prev, ...configWithoutCf });
     storeManager.set('dataSyncConfig', merged);
 
     this.broadcastRemoteServerConfigUpdated();
@@ -150,6 +160,7 @@ export default class RemoteServerConfigCtr extends ControllerModule {
 
     // Clear tokens (if any)
     await this.clearTokens();
+    this.clearCfTokens();
 
     this.broadcastRemoteServerConfigUpdated();
 
@@ -167,6 +178,13 @@ export default class RemoteServerConfigCtr extends ControllerModule {
    */
   private encryptedAccessToken?: string;
   private encryptedRefreshToken?: string;
+
+  /**
+   * CF Service Token
+   * Stored encrypted in electron-store, cached decrypted in memory.
+   */
+  private cfAccessClientId?: string;
+  private cfAccessClientSecret?: string;
 
   /**
    * Token expiration time (timestamp in milliseconds)
@@ -331,6 +349,85 @@ export default class RemoteServerConfigCtr extends ControllerModule {
   }
 
   /**
+   * Encrypt and save CF Service Token.
+   * Caches decrypted values in memory for synchronous access.
+   */
+  saveCfTokens(clientId: string, clientSecret: string) {
+    logger.info('Saving CF Service Token');
+
+    if (!safeStorage.isEncryptionAvailable()) {
+      logger.warn('Safe storage not available, storing CF tokens unencrypted');
+      this.cfAccessClientId = clientId;
+      this.cfAccessClientSecret = clientSecret;
+      this.app.storeManager.set(this.encryptedCfTokensKey, {
+        clientId,
+        clientSecret,
+      });
+      return;
+    }
+
+    this.cfAccessClientId = clientId;
+    this.cfAccessClientSecret = clientSecret;
+
+    this.app.storeManager.set(this.encryptedCfTokensKey, {
+      clientId: Buffer.from(safeStorage.encryptString(clientId)).toString('base64'),
+      clientSecret: Buffer.from(safeStorage.encryptString(clientSecret)).toString('base64'),
+    });
+  }
+
+  /**
+   * Load CF Service Token from persistent storage into memory (decrypted).
+   */
+  loadCfTokens() {
+    logger.debug(`Loading CF tokens from store key: ${this.encryptedCfTokensKey}`);
+    const stored = this.app.storeManager.get(this.encryptedCfTokensKey);
+
+    if (!stored?.clientId || !stored?.clientSecret) return;
+
+    if (!safeStorage.isEncryptionAvailable()) {
+      this.cfAccessClientId = stored.clientId;
+      this.cfAccessClientSecret = stored.clientSecret;
+      return;
+    }
+
+    try {
+      this.cfAccessClientId = safeStorage.decryptString(Buffer.from(stored.clientId, 'base64'));
+      this.cfAccessClientSecret = safeStorage.decryptString(
+        Buffer.from(stored.clientSecret, 'base64'),
+      );
+      logger.debug('CF tokens loaded into memory');
+    } catch (error) {
+      logger.error('Failed to decrypt CF tokens:', error);
+      this.cfAccessClientId = undefined;
+      this.cfAccessClientSecret = undefined;
+    }
+  }
+
+  /**
+   * Get CF-Access-Client-Id and CF-Access-Client-Secret headers.
+   * Lazy-loads from store if not in memory.
+   * Returns empty object if no CF token is configured.
+   */
+  getCfHeaders(): Record<string, string> {
+    if (!this.cfAccessClientId) this.loadCfTokens();
+    if (!this.cfAccessClientId || !this.cfAccessClientSecret) return {};
+    return {
+      'CF-Access-Client-Id': this.cfAccessClientId,
+      'CF-Access-Client-Secret': this.cfAccessClientSecret,
+    };
+  }
+
+  /**
+   * Clear CF Service Token from memory and persistent storage.
+   */
+  clearCfTokens() {
+    logger.info('Clearing CF Service Token');
+    this.cfAccessClientId = undefined;
+    this.cfAccessClientSecret = undefined;
+    this.app.storeManager.delete(this.encryptedCfTokensKey);
+  }
+
+  /**
    * Get token expiration time
    */
   getTokenExpiresAt(): number | undefined {
@@ -486,6 +583,7 @@ export default class RemoteServerConfigCtr extends ControllerModule {
         'Content-Type': 'application/x-www-form-urlencoded',
       };
       appendVercelCookie(headers);
+      Object.assign(headers, this.getCfHeaders());
       const response = await netFetch(tokenUrl.toString(), { body, headers, method: 'POST' });
 
       if (!response.ok) {
@@ -559,6 +657,7 @@ export default class RemoteServerConfigCtr extends ControllerModule {
   // We might need a dedicated lifecycle method if constructor is too early for storeManager
   afterAppReady() {
     this.loadTokensFromStore();
+    this.loadCfTokens();
   }
 
   async getRemoteServerUrl(config?: DataSyncConfig) {

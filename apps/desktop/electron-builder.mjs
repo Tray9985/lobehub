@@ -209,6 +209,7 @@ const config = {
     }
   },
   appId: 'com.lobehub.lobehub-desktop',
+  productName: 'LobeHub',
   appImage: {
     artifactName: '${productName}-${version}.${ext}',
   },
