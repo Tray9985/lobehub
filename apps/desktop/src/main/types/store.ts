@@ -7,6 +7,10 @@ import type {
 export interface ElectronMainStore {
   appTrayVisible: boolean;
   dataSyncConfig: DataSyncConfig;
+  encryptedCfTokens: {
+    clientId?: string;
+    clientSecret?: string;
+  };
   encryptedTokens: {
     accessToken?: string;
     expiresAt?: number;

@@ -22,7 +22,7 @@ const UserUpdater = memo(() => {
   useStoreUpdater('isLoaded', isLoaded);
   useStoreUpdater('isSignedIn', isSignedIn);
 
-  // Sync user data from Better-Auth session to Zustand store.
+  // Sync Better-Auth session state to Zustand store.
   // Better-Auth refetches the session on tab focus (visibilitychange), which
   // gives us a new `betterAuthUser` reference each time even when the
   // underlying user is unchanged. We must merge into the existing user rather
@@ -30,6 +30,14 @@ const UserUpdater = memo(() => {
   // populated by `useInitUserState` (one-shot SWR) and would otherwise be
   // wiped on every focus, breaking downstream selectors (e.g. the daily-brief
   // recommendation SWR key resets to empty interests and refetches). LOBE-8597.
+  //
+  // `fullName` and `username` are managed by LobeHub's own tRPC profile
+  // endpoints (e.g. `user.updateFullName`) which write to `users` table and
+  // refresh the store via `useInitUserState` SWR. The Better-Auth session
+  // cookie may carry stale profile values (e.g. from login time, or because
+  // LobeHub's profile endpoints bypass Better-Auth's session cookie refresh).
+  // To avoid UI jitter where a newly updated `fullName` gets reverted to an
+  // old session snapshot, prefer the store's existing value when present.
   //
   // Guard the merge by user id: if the session switches to a different
   // account (e.g. another tab signed in as a different user, focus refetch
@@ -47,9 +55,9 @@ const UserUpdater = memo(() => {
             // Preserve avatar from settings, don't override with auth provider value
             avatar: baseUser?.avatar || '',
             email: betterAuthUser.email,
-            fullName: betterAuthUser.name,
+            fullName: baseUser?.fullName || betterAuthUser.name || '',
             id: betterAuthUser.id,
-            username: betterAuthUser.username,
+            username: baseUser?.username || betterAuthUser.username || '',
           } as LobeUser,
         };
       });

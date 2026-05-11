@@ -8,6 +8,7 @@ import { netFetch } from '@/utils/net-fetch';
 
 interface BackendProxyProtocolManagerOptions {
   getAccessToken: () => Promise<string | undefined | null>;
+  getCfHeaders?: () => Record<string, string>;
   rewriteUrl: (rawUrl: string) => Promise<string | null>;
   scheme: string;
   /**
@@ -18,6 +19,7 @@ interface BackendProxyProtocolManagerOptions {
 
 interface BackendProxyProtocolManagerRemoteBaseOptions {
   getAccessToken: () => Promise<string | undefined | null>;
+  getCfHeaders?: () => Record<string, string>;
   getRemoteBaseUrl: () => Promise<string | undefined | null>;
   scheme: string;
   /**
@@ -98,6 +100,7 @@ export class BackendProxyProtocolManager {
 
     this.register(session, {
       getAccessToken: options.getAccessToken,
+      getCfHeaders: options.getCfHeaders,
       rewriteUrl,
       scheme: options.scheme,
       source: options.source,
@@ -120,6 +123,13 @@ export class BackendProxyProtocolManager {
           headers.set('Oidc-Auth', token);
         }
         appendVercelCookie(headers);
+
+        if (options.getCfHeaders) {
+          const cfHeaders = options.getCfHeaders();
+          for (const [key, value] of Object.entries(cfHeaders)) {
+            headers.set(key, value);
+          }
+        }
 
         const requestInit: RequestInit & { duplex?: 'half' } = {
           headers,

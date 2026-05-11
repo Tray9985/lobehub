@@ -9,6 +9,8 @@ export enum StorageModeEnum {
  */
 export interface DataSyncConfig {
   active?: boolean;
+  cfAccessClientId?: string;
+  cfAccessClientSecret?: string;
   remoteServerUrl?: string;
   storageMode: StorageMode;
 }

@@ -21,6 +21,7 @@ describe('aiProviderSelectors', () => {
     },
     aiProviderLoadingIds: ['loading-provider'],
     aiProviderConfigUpdatingIds: ['updating-provider'],
+    aiProviderConfigUpdatingKeys: ['provider1:fetchOnClient'],
     activeAiProvider: 'provider1',
     aiProviderRuntimeConfig: {
       provider1: {
@@ -193,6 +194,23 @@ describe('aiProviderSelectors', () => {
 
     it('should return false for non-updating provider', () => {
       expect(aiProviderSelectors.isProviderConfigUpdating('provider1')(mockState)).toBe(false);
+    });
+  });
+
+  describe('isProviderConfigFieldUpdating', () => {
+    it('should return true for updating provider field', () => {
+      expect(
+        aiProviderSelectors.isProviderConfigFieldUpdating('provider1', 'fetchOnClient')(mockState),
+      ).toBe(true);
+    });
+
+    it('should return false for non-updating provider field', () => {
+      expect(
+        aiProviderSelectors.isProviderConfigFieldUpdating(
+          'provider1',
+          'keyVaults.apiKey',
+        )(mockState),
+      ).toBe(false);
     });
   });
 

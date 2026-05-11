@@ -121,6 +121,9 @@
       "@napi-rs/canvas",
       "electron",
       "electron-builder",
+      "electron-winstaller",
+      "esbuild",
+      "get-windows",
       "node-mac-permissions"
     ],
     "overrides": {

@@ -29,7 +29,12 @@ If you don't have it, please run \`openssl rand -base64 32\` to create one.
   }
 
   if (serverDBEnv.DATABASE_DRIVER === 'node') {
-    const client = new NodePool({ connectionString });
+    const client = new NodePool({
+      connectionString,
+      max: parseInt(process.env.DATABASE_POOL_MAX || '20', 10),
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    });
     // pg.Pool emits 'error' on idle clients when the backend connection drops.
     // Without a listener Node escalates it to uncaughtException and exits the process.
     // See: https://node-postgres.com/apis/pool#error

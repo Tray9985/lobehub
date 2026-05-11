@@ -20,7 +20,8 @@ const Home: FC = () => {
       <NavHeader />
       <Flexbox
         height={'100%'}
-        style={{ overflowY: 'auto', paddingBlock: '44px 16vh' }}
+        justify={'center'}
+        style={{ overflowY: 'auto' }}
         width={'100%'}
       >
         <WideScreenContainer>

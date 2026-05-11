@@ -69,6 +69,11 @@ const providerConfigById =
 const isProviderConfigUpdating = (id: string) => (s: AIProviderStoreState) =>
   s.aiProviderConfigUpdatingIds.includes(id);
 
+const providerConfigUpdatingKey = (id: string, field: string) => `${id}:${field}`;
+
+const isProviderConfigFieldUpdating = (id: string, field: string) => (s: AIProviderStoreState) =>
+  s.aiProviderConfigUpdatingKeys.includes(providerConfigUpdatingKey(id, field));
+
 /**
  * @description The conditions to enable client fetch
  * 1. If no baseUrl and apikey input, force on Server.
@@ -144,6 +149,7 @@ export const aiProviderSelectors = {
   isAiProviderConfigLoading,
   isInitAiProviderRuntimeState,
   isProviderConfigUpdating,
+  isProviderConfigFieldUpdating,
   isProviderEnableResponseApi,
   isProviderEnabled,
   isProviderFetchOnClient,

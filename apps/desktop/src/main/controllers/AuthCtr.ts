@@ -364,6 +364,7 @@ export default class AuthCtr extends ControllerModule {
       // Use Electron net.fetch to respect system CA store (self-signed/private CA certs)
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       appendVercelCookie(headers);
+      Object.assign(headers, this.remoteServerConfigCtr.getCfHeaders());
       const response = await netFetch(url.toString(), { headers, method: 'GET' });
 
       // Check response status
@@ -482,6 +483,7 @@ export default class AuthCtr extends ControllerModule {
         'Content-Type': 'application/x-www-form-urlencoded',
       };
       appendVercelCookie(tokenHeaders);
+      Object.assign(tokenHeaders, this.remoteServerConfigCtr.getCfHeaders());
       const response = await netFetch(tokenUrl.toString(), {
         body,
         headers: tokenHeaders,

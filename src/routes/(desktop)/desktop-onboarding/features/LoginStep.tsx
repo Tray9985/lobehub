@@ -70,6 +70,9 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
   const [showEndpoint, setShowEndpoint] = useState(false);
   const [hasLegacyLocalDb, setHasLegacyLocalDb] = useState(false);
   const [localRemainingSeconds, setLocalRemainingSeconds] = useState<number | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [cfClientId, setCfClientId] = useState('');
+  const [cfClientSecret, setCfClientSecret] = useState('');
   const { compositionProps, isComposingRef } = useIMECompositionEvent();
 
   const [
@@ -154,7 +157,12 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
     setRemoteError(null);
     clearRemoteServerSyncError();
     setSelfhostLoginStatus('loading');
-    await connectRemoteServer({ remoteServerUrl: url, storageMode: 'selfHost' });
+    await connectRemoteServer({
+      cfAccessClientId: cfClientId.trim() || undefined,
+      cfAccessClientSecret: cfClientSecret.trim() || undefined,
+      remoteServerUrl: url,
+      storageMode: 'selfHost',
+    });
   };
 
   // Sign out (disconnect remote sync authorization) and return to login selection
@@ -479,6 +487,31 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
             }
           }}
         />
+        <Button block type={'text'} onClick={() => setShowAdvanced(!showAdvanced)}>
+          {showAdvanced ? t('screen5.selfhost.advanced.hide') : t('screen5.selfhost.advanced.show')}
+        </Button>
+        {showAdvanced && (
+          <Flexbox gap={12}>
+            <Input
+              placeholder={t('screen5.selfhost.cfClientId.placeholder')}
+              size={'large'}
+              style={{ width: '100%' }}
+              value={cfClientId}
+              onChange={(e) => setCfClientId(e.target.value)}
+            />
+            <Input
+              placeholder={t('screen5.selfhost.cfClientSecret.placeholder')}
+              size={'large'}
+              style={{ width: '100%' }}
+              type={'password'}
+              value={cfClientSecret}
+              onChange={(e) => setCfClientSecret(e.target.value)}
+            />
+            <Text style={{ color: cssVar.colorTextDescription, fontSize: 12 }}>
+              {t('screen5.selfhost.cfToken.desc')}
+            </Text>
+          </Flexbox>
+        )}
         <Button
           disabled={!endpoint.trim() || isConnectingServer}
           loading={false}

@@ -99,6 +99,12 @@ export default {
   'screen5.methods.selfhost.name': 'Self-hosted Instance',
   'screen5.navigation.next': 'Get Started',
   'screen5.selfhost.endpointPlaceholder': 'Enter your server URL (e.g., https://your-server.com)',
+  'screen5.selfhost.advanced.hide': 'Hide advanced options',
+  'screen5.selfhost.advanced.show': 'Advanced options (Service Token)',
+  'screen5.selfhost.cfClientId.placeholder': 'CF-Access-Client-Id (e.g., xxx.access)',
+  'screen5.selfhost.cfClientSecret.placeholder': 'CF-Access-Client-Secret',
+  'screen5.selfhost.cfToken.desc':
+    'For Cloudflare Zero Trust protected instances. Leave empty if not using CF Access.',
   'screen5.title': 'Sign in to sync across devices',
   'screen5.title2': 'Keep your data synchronized everywhere',
   'screen5.title3': 'Your data stays in your control',

@@ -2,7 +2,11 @@ import console from 'node:console';
 import path from 'node:path';
 
 import { APP_WINDOW_MIN_SIZE } from '@lobechat/desktop-bridge';
-import type { MainBroadcastEventKey, MainBroadcastParams } from '@lobechat/electron-client-ipc';
+import type {
+  DataSyncConfig,
+  MainBroadcastEventKey,
+  MainBroadcastParams,
+} from '@lobechat/electron-client-ipc';
 import type { BrowserWindowConstructorOptions } from 'electron';
 import { app, BrowserWindow, ipcMain, screen, session as electronSession, shell } from 'electron';
 
@@ -529,6 +533,19 @@ export default class Browser {
 
       appendVercelCookie(requestHeaders);
 
+      // Inject CF-Access headers for self-hosted servers behind Cloudflare Zero Trust
+      const remoteServerConfigCtr = this.app.getController(RemoteServerConfigCtr);
+      const dataSyncConfig = this.app.storeManager.get('dataSyncConfig') as DataSyncConfig;
+      if (
+        dataSyncConfig?.remoteServerUrl &&
+        details.url.startsWith(dataSyncConfig.remoteServerUrl)
+      ) {
+        const cfHeaders = remoteServerConfigCtr.getCfHeaders();
+        for (const [key, value] of Object.entries(cfHeaders)) {
+          requestHeaders[key] = value;
+        }
+      }
+
       callback({ requestHeaders });
     });
 
@@ -572,6 +589,7 @@ export default class Browser {
 
     backendProxyProtocolManager.registerWithRemoteBaseUrl(targetSession, {
       getAccessToken: () => remoteServerConfigCtr.getAccessToken(),
+      getCfHeaders: () => remoteServerConfigCtr.getCfHeaders(),
       getRemoteBaseUrl: async () => {
         const config = await remoteServerConfigCtr.getRemoteServerConfig();
         const remoteServerUrl = await remoteServerConfigCtr.getRemoteServerUrl(config);

@@ -16,7 +16,6 @@ import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfi
 import BotIntegrationBanner, { BOT_INTEGRATION_BANNER_ID } from './BotIntegrationBanner';
 import { stripMarkdownLinks } from './hintFormat';
 import SkillInstallBanner, { SKILL_INSTALL_BANNER_ID } from './SkillInstallBanner';
-import StarterList from './StarterList';
 import { useSend } from './useSend';
 
 const leftActions: ActionKeys[] = ['model', 'search', 'fileUpload', 'tools'];
@@ -96,9 +95,6 @@ const InputArea = () => {
     [],
   );
 
-  // Daily-generated input hint paired with the home WelcomeText. The hint
-  // tracks whichever pair the WelcomeText typewriter is currently showing,
-  // via the shared rotating index inside `useHomeDailyBrief`.
   const { currentPair } = useHomeDailyBrief();
   const dailyHint = currentPair?.hint ? stripMarkdownLinks(currentPair.hint) : undefined;
 
@@ -143,8 +139,6 @@ const InputArea = () => {
           </ChatInputProvider>
         </DragUploadZone>
       </Flexbox>
-
-      <StarterList />
     </Flexbox>
   );
 };
