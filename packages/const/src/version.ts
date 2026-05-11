@@ -1,4 +1,4 @@
-import { BRANDING_NAME, ORG_NAME } from '@lobechat/business-const';
+import { BRANDING_LOGO_URL, BRANDING_NAME, ORG_NAME } from '@lobechat/business-const';
 
 import pkg from '../../../package.json';
 
