@@ -4,7 +4,9 @@ import { ChatInput, ChatInputActionBar, SendButton } from '@lobehub/editor/react
 import { Flexbox, TextArea } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
 import type { KeyboardEvent, ReactNode } from 'react';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
+
+import { getFileListFromDataTransferItems } from '@/components/DragUploadZone/useLocalDragUpload';
 
 interface GenerationPromptInputProps {
   centerActions?: ReactNode;
@@ -20,6 +22,7 @@ interface GenerationPromptInputProps {
   maxRows?: number;
   minRows?: number;
   onGenerate: () => Promise<void> | void;
+  onPasteFiles?: (files: File[]) => void;
   onValueChange: (value: string) => void;
   placeholder: string;
   rightActions?: ReactNode;
@@ -46,6 +49,7 @@ const GenerationPromptInput = memo<GenerationPromptInputProps>(
     value,
     onValueChange,
     onGenerate,
+    onPasteFiles,
     placeholder,
     generateLabel,
     generatingLabel,
@@ -62,6 +66,26 @@ const GenerationPromptInput = memo<GenerationPromptInputProps>(
       await onGenerate();
     };
 
+    const handlePaste = useCallback(
+      async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        if (!onPasteFiles || !e.clipboardData?.items) return;
+
+        const items = Array.from(e.clipboardData.items);
+        const imageItems = items.filter((item) => item.type.startsWith('image/'));
+
+        if (imageItems.length === 0) return;
+
+        e.preventDefault();
+
+        const files = await getFileListFromDataTransferItems(items);
+
+        if (files.length === 0) return;
+
+        onPasteFiles(files);
+      },
+      [onPasteFiles],
+    );
+
     const textarea = (
       <TextArea
         autoSize={{ maxRows, minRows }}
@@ -71,6 +95,7 @@ const GenerationPromptInput = memo<GenerationPromptInputProps>(
         variant={'borderless'}
         onChange={(e) => onValueChange(e.target.value)}
         onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
       />
     );
 

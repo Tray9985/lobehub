@@ -25,6 +25,7 @@ import { AspectRatioSelect } from '@/routes/(main)/(create)/image/features/Confi
 import Select from '@/routes/(main)/(create)/image/features/ConfigPanel/components/Select';
 import VideoModelItem from '@/routes/(main)/(create)/video/features/ConfigPanel/components/ModelSelect/VideoModelItem';
 import { aiProviderSelectors, useAiInfraStore } from '@/store/aiInfra';
+import { useFileStore } from '@/store/file';
 import { useUserStore } from '@/store/user';
 import { authSelectors } from '@/store/user/slices/auth/selectors';
 import { useVideoStore } from '@/store/video';
@@ -234,6 +235,7 @@ const PromptInput = ({ showTitle = false }: PromptInputProps) => {
   const isSupportWebSearch = useVideoStore(isSupportedParamSelector('webSearch'));
   const isLogin = useUserStore(authSelectors.isLogin);
   const { value: duration } = useVideoGenerationConfigParam('duration');
+  const uploadWithProgress = useFileStore((s) => s.uploadWithProgress);
   useFetchAiVideoConfig();
 
   // Read query parameters
@@ -349,6 +351,24 @@ const PromptInput = ({ showTitle = false }: PromptInputProps) => {
       setEndImageUrl((url ?? null) as any);
     },
     [setEndImageUrl],
+  );
+
+  const handlePasteFiles = useCallback(
+    async (files: File[]) => {
+      for (const file of files) {
+        const result = await uploadWithProgress({
+          file,
+          onStatusUpdate: () => {},
+          skipCheckFileType: true,
+        });
+        if (result?.url) {
+          handleAddImage(
+            result.dimensions ? { dimensions: result.dimensions, url: result.url } : result.url,
+          );
+        }
+      }
+    },
+    [uploadWithProgress, handleAddImage],
   );
 
   return (
@@ -482,6 +502,7 @@ const PromptInput = ({ showTitle = false }: PromptInputProps) => {
             <PromptTransformAction mode={'video'} prompt={value} onPromptChange={setValue as any} />
           }
           onGenerate={handleGenerate}
+          onPasteFiles={handlePasteFiles}
           onValueChange={setValue}
         />
         <VideoFreeQuotaInfo />

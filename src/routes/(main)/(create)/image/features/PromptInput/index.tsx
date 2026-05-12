@@ -33,6 +33,7 @@ import {
 } from '@/routes/(main)/(create)/image/features/ConfigPanel';
 import ImageModelItem from '@/routes/(main)/(create)/image/features/ConfigPanel/components/ModelSelect/ImageModelItem';
 import { aiProviderSelectors, useAiInfraStore } from '@/store/aiInfra';
+import { useFileStore } from '@/store/file';
 import { useImageStore } from '@/store/image';
 import { createImageSelectors, imageGenerationConfigSelectors } from '@/store/image/selectors';
 import {
@@ -130,6 +131,7 @@ const PromptInput = ({ showTitle = false }: PromptInputProps) => {
   const enabledImageModelList = useAiInfraStore(aiProviderSelectors.enabledImageModelList);
   const { showDimensionControl } = useDimensionControl();
   const { autoSetDimensions, extractUrlAndDimensions } = useAutoDimensions();
+  const uploadWithProgress = useFileStore((s) => s.uploadWithProgress);
 
   useFetchAiImageConfig();
 
@@ -228,6 +230,24 @@ const PromptInput = ({ showTitle = false }: PromptInputProps) => {
 
   const showInlineRef = isSupportImageUrl || isSupportImageUrls;
   const hasRefImages = imagePreviewUrls.length > 0;
+
+  const handlePasteFiles = useCallback(
+    async (files: File[]) => {
+      for (const file of files) {
+        const result = await uploadWithProgress({
+          file,
+          onStatusUpdate: () => {},
+          skipCheckFileType: true,
+        });
+        if (result?.url) {
+          handleAddImage(
+            result.dimensions ? { dimensions: result.dimensions, url: result.url } : result.url,
+          );
+        }
+      }
+    },
+    [uploadWithProgress, handleAddImage],
+  );
 
   const maxCount = useMemo(() => {
     let count = 0;
@@ -353,6 +373,7 @@ const PromptInput = ({ showTitle = false }: PromptInputProps) => {
           <PromptTransformAction mode={'image'} prompt={value} onPromptChange={setValue as any} />
         }
         onGenerate={handleGenerate}
+        onPasteFiles={handlePasteFiles}
         onValueChange={setValue}
       />
     </Flexbox>
