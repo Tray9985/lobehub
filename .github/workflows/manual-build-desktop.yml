@@ -1,4 +1,4 @@
-name: Desktop Manual Build
+name: Build Desktop App
 
 on:
   workflow_dispatch:
