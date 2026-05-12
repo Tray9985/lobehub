@@ -11,16 +11,14 @@ import { useTranslation } from 'react-i18next';
 import { type ImageGenerationTopic } from '@/types/generation';
 
 import { useGenerationTopicContext } from '../StoreContext';
-import GridItem from './GridItem';
 import ListItem from './ListItem';
 
 interface TopicItemProps {
-  showMoreInfo?: boolean;
   style?: CSSProperties;
   topic: ImageGenerationTopic;
 }
 
-const TopicItem = memo<TopicItemProps>(({ topic, showMoreInfo, style }) => {
+const TopicItem = memo<TopicItemProps>(({ topic, style }) => {
   const { useStore, namespace } = useGenerationTopicContext();
   const { t } = useTranslation(namespace);
   const { modal } = App.useApp();
@@ -83,10 +81,8 @@ const TopicItem = memo<TopicItemProps>(({ topic, showMoreInfo, style }) => {
     },
   ];
 
-  const RenderItem = showMoreInfo ? ListItem : GridItem;
-
   return (
-    <RenderItem
+    <ListItem
       contextMenuItems={menuItems}
       isActive={isActive}
       isLoading={isLoading}

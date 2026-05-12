@@ -1,7 +1,6 @@
 'use client';
 
-import { ActionIcon, Avatar, type GenericItemType } from '@lobehub/ui';
-import { cssVar } from 'antd-style';
+import { ActionIcon, type GenericItemType } from '@lobehub/ui';
 import { Trash } from 'lucide-react';
 import type { CSSProperties, MouseEvent } from 'react';
 import { memo } from 'react';
@@ -38,18 +37,6 @@ const ListItem = memo<TopicItemProps>(
         loading={isLoading || isUpdating}
         style={style}
         title={topic.title || t('topic.untitled')}
-        icon={
-          <Avatar
-            avatar={topic.coverUrl ?? ''}
-            background={cssVar.colorFillSecondary}
-            loading={isLoading}
-            shape="square"
-            size={32}
-            style={{
-              flex: 'none',
-            }}
-          />
-        }
         onClick={onClick}
       />
     );
