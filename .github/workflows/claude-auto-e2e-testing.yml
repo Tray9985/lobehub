@@ -55,7 +55,7 @@ jobs:
         uses: ./.github/actions/setup-env
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Install Playwright browsers (with system deps)
         run: bunx playwright install --with-deps chromium

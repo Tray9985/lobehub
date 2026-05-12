@@ -4,8 +4,7 @@ name: Release Desktop Canary
 # Canary 自动发版工作流
 # ============================================
 # 触发条件:
-#   1. canary 分支有 push (合入 PR) 且 commit 前缀为 style/feat/fix/refactor/release (支持 gitmoji)
-#   2. 手动触发 (workflow_dispatch)
+#   1. 手动触发 (workflow_dispatch)
 #
 # 并发策略:
 #   同一 workflow 仅保留最新一次运行，自动取消排队中的旧 build
@@ -17,16 +16,7 @@ name: Release Desktop Canary
 # ============================================
 
 on:
-  push:
-    branches:
-      - canary
-  workflow_dispatch:
-    inputs:
-      force:
-        description: 'Force build (skip commit message check)'
-        required: false
-        type: boolean
-        default: false
+  workflow_dispatch: {}
 
 concurrency:
   group: ${{ github.workflow }}
@@ -39,7 +29,7 @@ env:
 
 jobs:
   # ============================================
-  # 检查 commit 前缀并计算版本号
+  # 手动触发校验并计算版本号
   # ============================================
   calculate-version:
     name: Calculate Canary Version
@@ -54,35 +44,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check commit message prefix
+      - name: Confirm manual trigger
         id: check
         run: |
-          # 手动触发 + force 时跳过检查
-          if [ "${{ inputs.force }}" == "true" ]; then
-            echo "should_build=true" >> $GITHUB_OUTPUT
-            echo "🔧 Force build requested, skipping commit check"
-            exit 0
-          fi
-
-          # 手动触发 (无 force) 也直接构建
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "should_build=true" >> $GITHUB_OUTPUT
-            echo "🔧 Manual trigger, proceeding with build"
-            exit 0
-          fi
-
-          # 获取本次 push 的 head commit message
-          commit_msg=$(git log -1 --pretty=%s HEAD)
-          echo "📝 Head commit: $commit_msg"
-
-          # 检查是否匹配 style/feat/fix/refactor/release 前缀 (支持 gitmoji 前缀)
-          if echo "$commit_msg" | grep -qiE '^(💄\s*)?style(\(.+\))?:|^(✨\s*)?feat(\(.+\))?:|^(🐛\s*)?fix(\(.+\))?:|^(♻️\s*)?refactor(\(.+\))?:|^(🚀\s*)?release(\(.+\))?:'; then
-            echo "should_build=true" >> $GITHUB_OUTPUT
-            echo "✅ Commit matches canary build trigger: $commit_msg"
-          else
-            echo "should_build=false" >> $GITHUB_OUTPUT
-            echo "⏭️ Commit does not match style/feat/fix/refactor/release prefix, skipping: $commit_msg"
-          fi
+          echo "should_build=true" >> $GITHUB_OUTPUT
+          echo "🔧 Manual trigger, proceeding with build"
 
       - name: Calculate canary version
         if: steps.check.outputs.should_build == 'true'
@@ -165,7 +131,7 @@ jobs:
             echo "### ⚠️ Important Notes"
             echo
             echo "- **This is an automated canary build and is NOT intended for production use.**"
-            echo "- Canary builds are triggered by \`build\`/\`fix\`/\`style\` commits on the \`canary\` branch."
+            echo "- Canary builds are triggered manually from GitHub Actions."
             echo "- May contain **unstable or incomplete changes**. **Use at your own risk.**"
             echo "- It is strongly recommended to **back up your data** before using a canary build."
             echo
