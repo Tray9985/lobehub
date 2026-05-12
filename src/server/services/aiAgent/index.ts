@@ -865,7 +865,7 @@ export class AiAgentService {
     const { LOBE_DEFAULT_MODEL_LIST } = await import('model-bank');
     // Resolve S3 keys in imageList/videoList before visual tool activation checks and context build.
     const fileService = new FileService(this.db, this.userId);
-    const postProcessUrl = (path: string | null) => fileService.getFullFileUrl(path);
+    const postProcessUrl = (path: string | null) => fileService.getExternalFileUrl(path);
     let historyMessagesCache: any[] | undefined;
     const loadHistoryMessages = async () => {
       if (historyMessagesCache) return historyMessagesCache;
@@ -1566,7 +1566,7 @@ export class AiAgentService {
           }
 
           fileIds.push(file.id);
-          const resolvedUrl = (await fileService.getFullFileUrl(file.url)) || file.url;
+          const resolvedUrl = (await fileService.getExternalFileUrl(file.url)) || file.url;
           const fileType = file.fileType || '';
 
           if (fileType.startsWith('image')) {

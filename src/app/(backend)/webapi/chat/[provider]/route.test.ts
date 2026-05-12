@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { auth } from '@/auth';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
+import { FileService } from '@/server/services/file';
 
 import { POST } from './route';
 
@@ -16,6 +17,12 @@ vi.mock('@/app/(backend)/middleware/auth/utils', () => ({
 vi.mock('@/server/modules/ModelRuntime', () => ({
   initModelRuntimeFromDB: vi.fn(),
   createTraceOptions: vi.fn().mockReturnValue({}),
+}));
+
+vi.mock('@/server/services/file', () => ({
+  FileService: vi.fn(() => ({
+    getExternalFileUrl: vi.fn(async (url: string) => `signed:${url}`),
+  })),
 }));
 
 vi.mock('@/auth', () => ({
@@ -104,6 +111,65 @@ describe('POST handler', () => {
         user: 'test-user-id',
         signal: expect.anything(),
       });
+    });
+
+    it('should resolve image and video urls before sending payload to runtime', async () => {
+      const mockParams = Promise.resolve({ provider: 'test-provider' });
+      const mockChatPayload = {
+        messages: [
+          {
+            content: [
+              { text: 'Please inspect these files', type: 'text' },
+              {
+                image_url: { detail: 'auto', url: 'https://lobehub.com/f/image-file' },
+                type: 'image_url',
+              },
+              {
+                type: 'video_url',
+                video_url: { url: 'https://lobehub.com/f/video-file' },
+              },
+            ],
+            role: 'user',
+          },
+        ],
+        model: 'test-model',
+      };
+      request = new Request(new URL('https://test.com'), {
+        body: JSON.stringify(mockChatPayload),
+        method: 'POST',
+      });
+
+      const mockChatResponse: any = { success: true, message: 'Reply from agent' };
+      const mockRuntime: LobeRuntimeAI = {
+        baseURL: 'abc',
+        chat: vi.fn().mockResolvedValue(mockChatResponse),
+      };
+
+      vi.mocked(initModelRuntimeFromDB).mockResolvedValue(new ModelRuntime(mockRuntime));
+
+      await POST(request as unknown as Request, { params: mockParams });
+
+      expect(FileService).toHaveBeenCalled();
+      expect(mockRuntime.chat).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: [
+            expect.objectContaining({
+              content: [
+                { text: 'Please inspect these files', type: 'text' },
+                {
+                  image_url: { detail: 'auto', url: 'signed:https://lobehub.com/f/image-file' },
+                  type: 'image_url',
+                },
+                {
+                  type: 'video_url',
+                  video_url: { url: 'signed:https://lobehub.com/f/video-file' },
+                },
+              ],
+            }),
+          ],
+        }),
+        expect.objectContaining({ user: 'test-user-id' }),
+      );
     });
 
     it('should return an error response when chat completion fails', async () => {

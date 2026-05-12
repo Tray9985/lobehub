@@ -4,6 +4,7 @@ import { ChatErrorType } from '@lobechat/types';
 
 import { checkAuth } from '@/app/(backend)/middleware/auth';
 import { createTraceOptions, initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
+import { FileService } from '@/server/services/file';
 import { type ChatStreamPayload } from '@/types/openai/chat';
 import { createErrorResponse } from '@/utils/errorResponse';
 import { getTracePayload } from '@/utils/trace';
@@ -11,6 +12,46 @@ import { getTracePayload } from '@/utils/trace';
 // If user don't use fluid compute, will build  failed
 // this enforce user to enable fluid compute
 export const maxDuration = 300;
+
+const resolveExternalMediaUrls = async (data: ChatStreamPayload, fileService: FileService) => {
+  if (!Array.isArray(data.messages)) return data;
+
+  const messages = await Promise.all(
+    data.messages.map(async (message) => {
+      if (!Array.isArray(message.content)) return message;
+
+      const content = await Promise.all(
+        message.content.map(async (part) => {
+          if (part.type === 'image_url') {
+            return {
+              ...part,
+              image_url: {
+                ...part.image_url,
+                url: await fileService.getExternalFileUrl(part.image_url.url),
+              },
+            };
+          }
+
+          if (part.type === 'video_url') {
+            return {
+              ...part,
+              video_url: {
+                ...part.video_url,
+                url: await fileService.getExternalFileUrl(part.video_url.url),
+              },
+            };
+          }
+
+          return part;
+        }),
+      );
+
+      return { ...message, content };
+    }),
+  );
+
+  return { ...data, messages };
+};
 
 export const POST = checkAuth(async (req: Request, { params, userId, serverDB }) => {
   const provider = (await params)!.provider!;
@@ -22,16 +63,18 @@ export const POST = checkAuth(async (req: Request, { params, userId, serverDB })
     // ============  2. create chat completion   ============ //
 
     const data = (await req.json()) as ChatStreamPayload;
+    const fileService = new FileService(serverDB, userId);
+    const payload = await resolveExternalMediaUrls(data, fileService);
 
     const tracePayload = getTracePayload(req);
 
     let traceOptions = {};
     // If user enable trace
     if (tracePayload?.enabled) {
-      traceOptions = createTraceOptions(data, { provider, trace: tracePayload });
+      traceOptions = createTraceOptions(payload, { provider, trace: tracePayload });
     }
 
-    return await modelRuntime.chat(data, {
+    return await modelRuntime.chat(payload, {
       user: userId,
       ...traceOptions,
       signal: req.signal,

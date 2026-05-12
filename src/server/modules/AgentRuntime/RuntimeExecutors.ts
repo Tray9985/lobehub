@@ -126,6 +126,17 @@ const buildPostProcessUrl = (ctx: Pick<RuntimeExecutorContext, 'serverDB' | 'use
   return (path: string | null) => fileService!.getFullFileUrl(path);
 };
 
+const buildExternalPostProcessUrl = (ctx: Pick<RuntimeExecutorContext, 'serverDB' | 'userId'>) => {
+  if (!ctx.userId || !ctx.serverDB) return undefined;
+  let fileService: FileService | undefined;
+  try {
+    fileService = new FileService(ctx.serverDB, ctx.userId);
+  } catch {
+    return undefined;
+  }
+  return (path: string | null) => fileService!.getExternalFileUrl(path);
+};
+
 const shouldRetryLLM = (kind: LLMErrorKind, attempt: number, maxRetries: number) =>
   kind === 'retry' && attempt <= maxRetries;
 
@@ -401,7 +412,7 @@ export const createRuntimeExecutors = (
                   groupId: topic?.groupId ?? undefined,
                   topicId,
                 },
-                { postProcessUrl: buildPostProcessUrl(ctx) },
+                { postProcessUrl: buildExternalPostProcessUrl(ctx) },
               );
             },
           );
@@ -1228,7 +1239,7 @@ export const createRuntimeExecutors = (
           threadId: state.metadata?.threadId,
           topicId,
         },
-        { postProcessUrl: buildPostProcessUrl(ctx) },
+        { postProcessUrl: buildExternalPostProcessUrl(ctx) },
       );
 
       const messageIds = dbMessages
@@ -2339,7 +2350,7 @@ export const createRuntimeExecutors = (
         threadId: state.metadata?.threadId,
         topicId: state.metadata?.topicId,
       },
-      { postProcessUrl: buildPostProcessUrl(ctx) },
+      { postProcessUrl: buildExternalPostProcessUrl(ctx) },
     );
 
     // Use conversation-flow parse to resolve branching into linear flat list

@@ -249,6 +249,95 @@ describe('FileService', () => {
     expect(result).toBe(expectedKey);
   });
 
+  describe('getExternalFileUrl', () => {
+    beforeEach(() => {
+      vi.mocked(service['impl'].createPreSignedUrlForPreview).mockResolvedValue(
+        'https://s3.example.com/presigned-url',
+      );
+    });
+
+    it('should return empty string for empty values', async () => {
+      await expect(service.getExternalFileUrl(null)).resolves.toBe('');
+      await expect(service.getExternalFileUrl(undefined)).resolves.toBe('');
+    });
+
+    it('should keep data urls unchanged', async () => {
+      const dataUrl = 'data:image/png;base64,abc';
+
+      await expect(service.getExternalFileUrl(dataUrl)).resolves.toBe(dataUrl);
+      expect(service['impl'].createPreSignedUrlForPreview).not.toHaveBeenCalled();
+    });
+
+    it('should keep external urls unchanged', async () => {
+      const externalUrl = 'https://example.com/image.png';
+
+      await expect(service.getExternalFileUrl(externalUrl)).resolves.toBe(externalUrl);
+      expect(service['impl'].createPreSignedUrlForPreview).not.toHaveBeenCalled();
+    });
+
+    it('should sign storage keys for one hour', async () => {
+      await expect(service.getExternalFileUrl('files/test.png')).resolves.toBe(
+        'https://s3.example.com/presigned-url',
+      );
+
+      expect(service['impl'].createPreSignedUrlForPreview).toHaveBeenCalledWith(
+        'files/test.png',
+        3600,
+      );
+    });
+
+    it('should resolve same-origin /f urls before signing', async () => {
+      vi.mocked(service['impl'].getKeyFromFullUrl).mockResolvedValue('files/from-proxy.png');
+
+      await expect(service.getExternalFileUrl('https://lobehub.com/f/file-id')).resolves.toBe(
+        'https://s3.example.com/presigned-url',
+      );
+
+      expect(service['impl'].getKeyFromFullUrl).toHaveBeenCalledWith(
+        'https://lobehub.com/f/file-id',
+      );
+      expect(service['impl'].createPreSignedUrlForPreview).toHaveBeenCalledWith(
+        'files/from-proxy.png',
+        3600,
+      );
+    });
+
+    it('should resolve relative /f urls before signing', async () => {
+      vi.mocked(service['impl'].getKeyFromFullUrl).mockResolvedValue('files/from-relative.png');
+
+      await expect(service.getExternalFileUrl('/f/file-id')).resolves.toBe(
+        'https://s3.example.com/presigned-url',
+      );
+
+      expect(service['impl'].getKeyFromFullUrl).toHaveBeenCalledWith(
+        'https://lobehub.com/f/file-id',
+      );
+      expect(service['impl'].createPreSignedUrlForPreview).toHaveBeenCalledWith(
+        'files/from-relative.png',
+        3600,
+      );
+    });
+
+    it('should throw when same-origin /f url cannot be resolved', async () => {
+      vi.mocked(service['impl'].getKeyFromFullUrl).mockResolvedValue(null);
+
+      await expect(service.getExternalFileUrl('https://lobehub.com/f/missing')).rejects.toThrow(
+        'File key not found from proxy url',
+      );
+    });
+
+    it('should resolve arrays with the same policy', async () => {
+      vi.mocked(service['impl'].createPreSignedUrlForPreview)
+        .mockResolvedValueOnce('https://s3.example.com/a')
+        .mockResolvedValueOnce('https://s3.example.com/b');
+
+      await expect(service.getExternalFileUrls(['files/a.png', 'files/b.png'])).resolves.toEqual([
+        'https://s3.example.com/a',
+        'https://s3.example.com/b',
+      ]);
+    });
+  });
+
   it('should delegate uploadMedia to implementation', async () => {
     const testKey = 'test-key';
     const testBuffer = Buffer.from('test content');

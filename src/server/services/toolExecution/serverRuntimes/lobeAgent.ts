@@ -153,7 +153,7 @@ class LobeAgentExecutionRuntime {
     if (requestedRefs.length > 0) {
       const fileService = new FileService(this.db, this.userId);
       const messageModel = new MessageModel(this.db, this.userId);
-      const postProcessUrl = (path: string | null) => fileService.getFullFileUrl(path);
+      const postProcessUrl = (path: string | null) => fileService.getExternalFileUrl(path);
       const [sourceMessage] = await messageModel.queryByIds([this.messageId], {
         postProcessUrl,
       });

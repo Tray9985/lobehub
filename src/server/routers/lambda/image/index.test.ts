@@ -9,6 +9,8 @@ const {
   mockServerDB,
   mockGetKeyFromFullUrl,
   mockGetFullFileUrl,
+  mockGetExternalFileUrl,
+  mockGetExternalFileUrls,
   mockAsyncTaskModelUpdate,
   mockChargeBeforeGenerate,
   mockCreateAsyncCaller,
@@ -19,6 +21,8 @@ const {
   },
   mockGetKeyFromFullUrl: vi.fn(),
   mockGetFullFileUrl: vi.fn(),
+  mockGetExternalFileUrl: vi.fn(),
+  mockGetExternalFileUrls: vi.fn(),
   mockAsyncTaskModelUpdate: vi.fn(),
   mockChargeBeforeGenerate: vi.fn(),
   mockCreateAsyncCaller: vi.fn(),
@@ -40,6 +44,8 @@ vi.mock('@/server/services/file', () => ({
   FileService: vi.fn(() => ({
     getKeyFromFullUrl: mockGetKeyFromFullUrl,
     getFullFileUrl: mockGetFullFileUrl,
+    getExternalFileUrl: mockGetExternalFileUrl,
+    getExternalFileUrls: mockGetExternalFileUrls,
   })),
 }));
 
@@ -118,6 +124,10 @@ describe('imageRouter', () => {
     mockChargeBeforeGenerate.mockResolvedValue(undefined);
     mockGetKeyFromFullUrl.mockResolvedValue(null);
     mockGetFullFileUrl.mockResolvedValue(null);
+    mockGetExternalFileUrl.mockImplementation(async (url: string) => `signed:${url}`);
+    mockGetExternalFileUrls.mockImplementation(async (urls: string[]) =>
+      urls.map((url) => `signed:${url}`),
+    );
 
     // Setup default transaction mock
     const mockBatch = {
@@ -351,6 +361,105 @@ describe('imageRouter', () => {
       );
     });
 
+    it('should send external signed imageUrl while keeping database config as key', async () => {
+      mockGetKeyFromFullUrl.mockResolvedValue('files/single-image.jpg');
+      mockGetExternalFileUrl.mockResolvedValue('https://s3.example.com/single-image-signed');
+
+      const ctx = createMockCtx();
+      const input = createDefaultInput({
+        params: {
+          prompt: 'test prompt',
+          imageUrl: 'https://lobehub.com/f/file-id',
+        },
+      });
+
+      const caller = imageRouter.createCaller(ctx);
+      await caller.createImage(input);
+
+      expect(mockGetExternalFileUrl).toHaveBeenCalledWith('files/single-image.jpg');
+      expect(mockChargeBeforeGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          configForDatabase: expect.objectContaining({ imageUrl: 'files/single-image.jpg' }),
+          generationParams: expect.objectContaining({
+            imageUrl: 'https://s3.example.com/single-image-signed',
+          }),
+        }),
+      );
+      expect(mockAsyncCallerCreateImage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          params: expect.objectContaining({
+            imageUrl: 'https://s3.example.com/single-image-signed',
+          }),
+        }),
+      );
+    });
+
+    it('should send external signed imageUrls while keeping database config as keys', async () => {
+      mockGetKeyFromFullUrl
+        .mockResolvedValueOnce('files/image1.jpg')
+        .mockResolvedValueOnce('files/image2.jpg');
+      mockGetExternalFileUrls.mockResolvedValue([
+        'https://s3.example.com/image1-signed',
+        'https://s3.example.com/image2-signed',
+      ]);
+
+      const ctx = createMockCtx();
+      const input = createDefaultInput({
+        params: {
+          prompt: 'test prompt',
+          imageUrls: ['https://lobehub.com/f/id1', 'https://lobehub.com/f/id2'],
+        },
+      });
+
+      const caller = imageRouter.createCaller(ctx);
+      await caller.createImage(input);
+
+      expect(mockGetExternalFileUrls).toHaveBeenCalledWith([
+        'files/image1.jpg',
+        'files/image2.jpg',
+      ]);
+      expect(mockChargeBeforeGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          configForDatabase: expect.objectContaining({
+            imageUrls: ['files/image1.jpg', 'files/image2.jpg'],
+          }),
+          generationParams: expect.objectContaining({
+            imageUrls: [
+              'https://s3.example.com/image1-signed',
+              'https://s3.example.com/image2-signed',
+            ],
+          }),
+        }),
+      );
+    });
+
+    it('should keep external image urls out of database but still pass them to outbound signing policy', async () => {
+      mockGetKeyFromFullUrl.mockResolvedValue(null);
+      mockGetExternalFileUrls.mockResolvedValue(['https://example.com/image.jpg']);
+
+      const ctx = createMockCtx();
+      const input = createDefaultInput({
+        params: {
+          prompt: 'test prompt',
+          imageUrls: ['https://example.com/image.jpg'],
+        },
+      });
+
+      const caller = imageRouter.createCaller(ctx);
+      const result = await caller.createImage(input);
+
+      expect(result.success).toBe(true);
+      expect(mockGetExternalFileUrls).toHaveBeenCalledWith(['https://example.com/image.jpg']);
+      expect(mockChargeBeforeGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          configForDatabase: expect.objectContaining({ imageUrls: [] }),
+          generationParams: expect.objectContaining({
+            imageUrls: ['https://example.com/image.jpg'],
+          }),
+        }),
+      );
+    });
+
     it('should trigger async image generation tasks', async () => {
       const ctx = createMockCtx();
       const input = createDefaultInput();
@@ -442,18 +551,12 @@ describe('imageRouter', () => {
       expect(result.success).toBe(true);
     });
 
-    describe('development environment URL conversion', () => {
-      beforeEach(() => {
-        vi.stubEnv('NODE_ENV', 'development');
-      });
-
-      afterEach(() => {
-        vi.unstubAllEnvs();
-      });
-
-      it('should convert single imageUrl to S3 URL in development mode', async () => {
+    describe('outbound URL conversion', () => {
+      it('should convert single imageUrl to external URL', async () => {
         mockGetKeyFromFullUrl.mockResolvedValue('files/image-key.jpg');
-        mockGetFullFileUrl.mockResolvedValue('https://s3.amazonaws.com/bucket/files/image-key.jpg');
+        mockGetExternalFileUrl.mockResolvedValue(
+          'https://s3.amazonaws.com/bucket/files/image-key.jpg',
+        );
 
         const ctx = createMockCtx();
         const input = createDefaultInput({
@@ -467,16 +570,17 @@ describe('imageRouter', () => {
         const result = await caller.createImage(input);
 
         expect(result.success).toBe(true);
-        expect(mockGetFullFileUrl).toHaveBeenCalledWith('files/image-key.jpg');
+        expect(mockGetExternalFileUrl).toHaveBeenCalledWith('files/image-key.jpg');
       });
 
-      it('should convert multiple imageUrls to S3 URLs in development mode', async () => {
+      it('should convert multiple imageUrls to external URLs', async () => {
         mockGetKeyFromFullUrl
           .mockResolvedValueOnce('files/image1.jpg')
           .mockResolvedValueOnce('files/image2.jpg');
-        mockGetFullFileUrl
-          .mockResolvedValueOnce('https://s3.amazonaws.com/bucket/files/image1.jpg')
-          .mockResolvedValueOnce('https://s3.amazonaws.com/bucket/files/image2.jpg');
+        mockGetExternalFileUrls.mockResolvedValue([
+          'https://s3.amazonaws.com/bucket/files/image1.jpg',
+          'https://s3.amazonaws.com/bucket/files/image2.jpg',
+        ]);
 
         const ctx = createMockCtx();
         const input = createDefaultInput({
@@ -490,28 +594,10 @@ describe('imageRouter', () => {
         const result = await caller.createImage(input);
 
         expect(result.success).toBe(true);
-        expect(mockGetFullFileUrl).toHaveBeenCalledTimes(2);
-        expect(mockGetFullFileUrl).toHaveBeenCalledWith('files/image1.jpg');
-        expect(mockGetFullFileUrl).toHaveBeenCalledWith('files/image2.jpg');
-      });
-
-      it('should not convert URLs when getFullFileUrl returns null', async () => {
-        mockGetKeyFromFullUrl.mockResolvedValue('files/image-key.jpg');
-        mockGetFullFileUrl.mockResolvedValue(null);
-
-        const ctx = createMockCtx();
-        const input = createDefaultInput({
-          params: {
-            prompt: 'test prompt',
-            imageUrl: 'http://localhost:3000/f/file-id',
-          },
-        });
-
-        const caller = imageRouter.createCaller(ctx);
-        const result = await caller.createImage(input);
-
-        expect(result.success).toBe(true);
-        expect(mockGetFullFileUrl).toHaveBeenCalled();
+        expect(mockGetExternalFileUrls).toHaveBeenCalledWith([
+          'files/image1.jpg',
+          'files/image2.jpg',
+        ]);
       });
     });
   });

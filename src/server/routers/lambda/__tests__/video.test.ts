@@ -13,6 +13,9 @@ const {
   mockResolveBusinessModelMapping,
   mockServerDB,
   mockTransaction,
+  mockGetExternalFileUrl,
+  mockGetExternalFileUrls,
+  mockGetKeyFromFullUrl,
 } = vi.hoisted(() => {
   const mockTransaction = vi.fn();
   const mockServerDB = { transaction: mockTransaction };
@@ -20,6 +23,9 @@ const {
   const mockAfter = vi.fn((cb: () => void) => cb());
   const mockProcessBackgroundVideoPolling = vi.fn().mockResolvedValue(undefined);
   const mockResolveBusinessModelMapping = vi.fn();
+  const mockGetExternalFileUrl = vi.fn();
+  const mockGetExternalFileUrls = vi.fn();
+  const mockGetKeyFromFullUrl = vi.fn();
   return {
     mockAfter,
     mockCreateVideo,
@@ -27,6 +33,9 @@ const {
     mockResolveBusinessModelMapping,
     mockServerDB,
     mockTransaction,
+    mockGetExternalFileUrl,
+    mockGetExternalFileUrls,
+    mockGetKeyFromFullUrl,
   };
 });
 
@@ -112,7 +121,9 @@ function setupMocks() {
     () =>
       ({
         getFullFileUrl: vi.fn().mockResolvedValue(null),
-        getKeyFromFullUrl: vi.fn().mockResolvedValue(null),
+        getExternalFileUrl: mockGetExternalFileUrl,
+        getExternalFileUrls: mockGetExternalFileUrls,
+        getKeyFromFullUrl: mockGetKeyFromFullUrl,
       }) as any,
   );
 
@@ -135,6 +146,11 @@ describe('videoRouter', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetExternalFileUrl.mockImplementation(async (url: string) => `signed:${url}`);
+    mockGetExternalFileUrls.mockImplementation(async (urls: string[]) =>
+      urls.map((url) => `signed:${url}`),
+    );
+    mockGetKeyFromFullUrl.mockResolvedValue(null);
     mockResolveBusinessModelMapping.mockImplementation(
       async (_provider: string, model: string) => ({
         resolvedModelId: model,
@@ -265,6 +281,42 @@ describe('videoRouter', () => {
       expect(result).toEqual({ error: 'insufficient_balance' });
       // Should not proceed to createVideo
       expect(mockCreateVideo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createVideo - outbound media URLs', () => {
+    it('should send external signed image urls while preserving database keys', async () => {
+      setupMocks();
+      mockGetKeyFromFullUrl
+        .mockResolvedValueOnce('files/start.png')
+        .mockResolvedValueOnce('files/end.png');
+      mockGetExternalFileUrl
+        .mockResolvedValueOnce('https://s3.example.com/start-signed')
+        .mockResolvedValueOnce('https://s3.example.com/end-signed');
+      mockCreateVideo.mockResolvedValue({ inferenceId: 'inf-signed', useWebhook: true });
+
+      const caller = videoRouter.createCaller(mockCtx);
+      await caller.createVideo({
+        ...defaultInput,
+        params: {
+          prompt: 'a cat dancing',
+          imageUrl: 'https://lobehub.com/f/start-file',
+          endImageUrl: 'https://lobehub.com/f/end-file',
+        },
+      });
+
+      expect(mockGetExternalFileUrl).toHaveBeenNthCalledWith(1, 'files/start.png');
+      expect(mockGetExternalFileUrl).toHaveBeenNthCalledWith(2, 'files/end.png');
+      expect(mockCreateVideo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          params: expect.objectContaining({
+            imageUrl: 'https://s3.example.com/start-signed',
+            endImageUrl: 'https://s3.example.com/end-signed',
+          }),
+        }),
+        expect.any(Object),
+      );
+      expect(mockTransaction).toHaveBeenCalled();
     });
   });
 

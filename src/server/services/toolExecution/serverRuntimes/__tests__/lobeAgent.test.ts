@@ -27,6 +27,7 @@ vi.mock('@/database/models/message', () => ({
 
 vi.mock('@/server/services/file', () => ({
   FileService: vi.fn().mockImplementation(() => ({
+    getExternalFileUrl: (path: string | null) => Promise.resolve(path || ''),
     getFullFileUrl: (path: string | null) => Promise.resolve(path || ''),
   })),
 }));

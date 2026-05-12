@@ -79,6 +79,9 @@ export const imageRouter = router({
 
     // Normalize reference image addresses, store S3 keys uniformly (avoid storing expiring presigned URLs in database)
     let configForDatabase = { ...params };
+    let externalImageUrl =
+      typeof params.imageUrl === 'string' && params.imageUrl ? params.imageUrl : undefined;
+    let externalImageUrls = params.imageUrls;
     // 1) Process multiple images in imageUrls
     if (Array.isArray(params.imageUrls) && params.imageUrls.length > 0) {
       log('Converting imageUrls to S3 keys for database storage: %O', params.imageUrls);
@@ -95,6 +98,7 @@ export const imageRouter = router({
           }),
         );
         const imageKeys = imageKeysWithNull.filter((key): key is string => key !== null);
+        externalImageUrls = params.imageUrls.map((url, index) => imageKeysWithNull[index] ?? url);
 
         configForDatabase = {
           ...configForDatabase,
@@ -113,8 +117,12 @@ export const imageRouter = router({
         if (key) {
           log('Converted single imageUrl to key: %s -> %s', params.imageUrl, key);
           configForDatabase = { ...configForDatabase, imageUrl: key };
+          externalImageUrl = key;
         } else {
           log('Failed to extract key from single imageUrl: %s', params.imageUrl);
+          const { imageUrl, ...restConfig } = configForDatabase;
+          void imageUrl;
+          configForDatabase = restConfig;
         }
       } catch (error) {
         console.error('Error converting imageUrl to key: %O', error);
@@ -122,32 +130,20 @@ export const imageRouter = router({
       }
     }
 
-    // In development, convert localhost proxy URLs to S3 URLs for async task access
+    // Convert internal file references to short-lived URLs for outbound provider access.
     let generationParams = params;
-    if (process.env.NODE_ENV === 'development') {
-      const updates: Record<string, unknown> = {};
+    const updates: Record<string, unknown> = {};
 
-      // Handle single imageUrl: localhost/f/{id} -> S3 URL
-      if (typeof params.imageUrl === 'string' && params.imageUrl) {
-        const s3Url = await fileService.getFullFileUrl(configForDatabase.imageUrl as string);
-        if (s3Url) {
-          log('Dev: converted proxy URL to S3 URL: %s -> %s', params.imageUrl, s3Url);
-          updates.imageUrl = s3Url;
-        }
-      }
+    if (externalImageUrl) {
+      updates.imageUrl = await fileService.getExternalFileUrl(externalImageUrl);
+    }
 
-      // Handle multiple imageUrls
-      if (Array.isArray(params.imageUrls) && params.imageUrls.length > 0) {
-        const s3Urls = await Promise.all(
-          (configForDatabase.imageUrls as string[]).map((key) => fileService.getFullFileUrl(key)),
-        );
-        log('Dev: converted proxy URLs to S3 URLs: %O', s3Urls);
-        updates.imageUrls = s3Urls;
-      }
+    if (Array.isArray(externalImageUrls) && externalImageUrls.length > 0) {
+      updates.imageUrls = await fileService.getExternalFileUrls(externalImageUrls);
+    }
 
-      if (Object.keys(updates).length > 0) {
-        generationParams = { ...params, ...updates };
-      }
+    if (Object.keys(updates).length > 0) {
+      generationParams = { ...params, ...updates };
     }
 
     // Defensive check: ensure no full URLs enter the database

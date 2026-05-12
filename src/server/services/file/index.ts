@@ -12,6 +12,8 @@ import { TempFileManager } from '@/server/utils/tempFileManager';
 import { createFileServiceModule } from './impls';
 import { type FileServiceImpl } from './impls/type';
 
+const EXTERNAL_FILE_URL_EXPIRE_IN = 60 * 60;
+
 /**
  * File service class
  * Provides file operation services using a modular implementation approach
@@ -78,6 +80,49 @@ export class FileService {
    */
   public async createPreSignedUrlForPreview(key: string, expiresIn?: number): Promise<string> {
     return this.impl.createPreSignedUrlForPreview(key, expiresIn);
+  }
+
+  /**
+   * Resolve file references for outbound provider/LLM payloads.
+   * Internal proxy URLs stay internal; external callers receive short-lived S3-compatible URLs.
+   */
+  public async getExternalFileUrl(
+    url?: string | null,
+    expiresIn: number = EXTERNAL_FILE_URL_EXPIRE_IN,
+  ): Promise<string> {
+    if (!url) return '';
+
+    if (url.startsWith('data:')) return url;
+
+    if (url.startsWith('/f/')) {
+      const key = await this.getKeyFromFullUrl(new URL(url, appEnv.APP_URL).toString());
+      if (!key) throw new Error(`File key not found from proxy url: ${url}`);
+
+      return this.createPreSignedUrlForPreview(key, expiresIn);
+    }
+
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      const urlObject = new URL(url);
+      const appUrl = new URL(appEnv.APP_URL);
+
+      if (urlObject.origin !== appUrl.origin) return url;
+
+      if (!urlObject.pathname.startsWith('/f/')) return url;
+
+      const key = await this.getKeyFromFullUrl(url);
+      if (!key) throw new Error(`File key not found from proxy url: ${url}`);
+
+      return this.createPreSignedUrlForPreview(key, expiresIn);
+    }
+
+    return this.createPreSignedUrlForPreview(url, expiresIn);
+  }
+
+  public async getExternalFileUrls(
+    urls: string[],
+    expiresIn: number = EXTERNAL_FILE_URL_EXPIRE_IN,
+  ): Promise<string[]> {
+    return Promise.all(urls.map((url) => this.getExternalFileUrl(url, expiresIn)));
   }
 
   /**

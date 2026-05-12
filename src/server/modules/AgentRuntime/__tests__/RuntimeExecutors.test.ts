@@ -24,6 +24,13 @@ vi.mock('@/server/services/message', () => ({
   })),
 }));
 
+vi.mock('@/server/services/file', () => ({
+  FileService: vi.fn().mockImplementation(() => ({
+    getExternalFileUrl: vi.fn(async (path: string | null) => (path ? `signed:${path}` : '')),
+    getFullFileUrl: vi.fn(async (path: string | null) => path || ''),
+  })),
+}));
+
 // @lobechat/model-runtime resolves to @cloud/business-model-runtime which has
 // cloud-specific dependencies that are unavailable in the test environment
 vi.mock('@lobechat/model-runtime', () => ({

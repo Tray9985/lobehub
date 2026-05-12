@@ -108,6 +108,9 @@ vi.mock('@/server/services/klavis', () => ({
 
 vi.mock('@/server/services/file', () => ({
   FileService: vi.fn().mockImplementation(() => ({
+    getExternalFileUrl: vi
+      .fn()
+      .mockImplementation((key: string) => Promise.resolve(`https://s3.example.com/${key}`)),
     getFullFileUrl: vi
       .fn()
       .mockImplementation((key: string) => Promise.resolve(`https://s3.example.com/${key}`)),

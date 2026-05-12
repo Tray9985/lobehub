@@ -34,6 +34,9 @@ vi.mock('@/database/core/db-adaptor', () => ({
 
 vi.mock('@/server/services/file', () => ({
   FileService: vi.fn().mockImplementation(() => ({
+    getExternalFileUrl: vi
+      .fn()
+      .mockImplementation((path: string) => (path ? `/files${path}` : null)),
     getFullFileUrl: vi.fn().mockImplementation((path: string) => (path ? `/files${path}` : null)),
   })),
 }));

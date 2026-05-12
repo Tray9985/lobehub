@@ -110,6 +110,7 @@ vi.mock('@/server/services/klavis', () => ({
 // Mock FileService
 vi.mock('@/server/services/file', () => ({
   FileService: vi.fn().mockImplementation(() => ({
+    getExternalFileUrl: (path: string | null) => Promise.resolve(path || ''),
     uploadFromUrl: vi.fn(),
   })),
 }));
