@@ -8,11 +8,13 @@ import { type ImageGenerationTopic } from '@/types/generation';
 
 export interface GenerationTopicStoreSlice {
   activeGenerationTopicId: string | null;
+  autoRenameGenerationTopicTitle: (id: string) => Promise<void>;
   generationTopics: ImageGenerationTopic[];
   loadingGenerationTopicIds: string[];
   openNewGenerationTopic: () => void;
   removeGenerationTopic: (id: string) => Promise<void>;
   switchGenerationTopic: (topicId: string) => void;
+  updateGenerationTopicTitle: (id: string, title: string) => Promise<void>;
   useFetchGenerationTopics: (enabled: boolean) => SWRResponse<ImageGenerationTopic[]>;
 }
 

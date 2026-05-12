@@ -22,7 +22,7 @@ const List = memo<Pick<GenerationLayoutCommonProps, 'namespace' | 'useStore'>>(
     return (
       <GenerationTopicStoreProvider value={{ namespace, useStore: useStore as any }}>
         <Suspense fallback={<SkeletonList rows={6} />}>
-          <Flexbox gap={4} paddingBlock={1}>
+          <Flexbox gap={1} paddingBlock={1}>
             <TopicList />
             <TopicUrlSync />
           </Flexbox>

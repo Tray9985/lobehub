@@ -6,6 +6,7 @@ import { LOADING_FLAT } from '@/const/message';
 import { mutate, useClientDataSWR } from '@/libs/swr';
 import { type UpdateTopicValue } from '@/server/routers/lambda/generationTopic';
 import { chatService } from '@/services/chat';
+import { generationBatchService } from '@/services/generationBatch';
 import { generationTopicService } from '@/services/generationTopic';
 import { type StoreSetter } from '@/store/types';
 import { useUserStore } from '@/store/user';
@@ -264,6 +265,23 @@ export class GenerationTopicActionImpl {
   updateGenerationTopicCover = async (topicId: string, coverUrl: string): Promise<void> => {
     const { internal_updateGenerationTopicCover } = this.#get();
     await internal_updateGenerationTopicCover(topicId, coverUrl);
+  };
+
+  updateGenerationTopicTitle = async (id: string, title: string): Promise<void> => {
+    await this.#get().internal_updateGenerationTopic(id, { title });
+  };
+
+  autoRenameGenerationTopicTitle = async (id: string): Promise<void> => {
+    const cachedBatches = this.#get().generationBatchesMap[id] || [];
+    const batches =
+      cachedBatches.length > 0
+        ? cachedBatches
+        : await generationBatchService.getGenerationBatches(id, 'video');
+    const prompts = batches.map((batch) => batch.prompt).filter(Boolean);
+
+    if (prompts.length === 0) throw new Error(`No prompts found for generation topic ${id}`);
+
+    await this.#get().summaryGenerationTopicTitle(id, prompts);
   };
 
   useFetchGenerationTopics = (enabled: boolean): SWRResponse<ImageGenerationTopic[]> =>

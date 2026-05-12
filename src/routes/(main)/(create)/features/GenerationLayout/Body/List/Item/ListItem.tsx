@@ -1,13 +1,16 @@
 'use client';
 
-import { ActionIcon, type GenericItemType } from '@lobehub/ui';
-import { Trash } from 'lucide-react';
-import type { CSSProperties, MouseEvent } from 'react';
+import type { GenericItemType } from '@lobehub/ui';
+import { ActionIcon, DropdownMenu, Icon } from '@lobehub/ui';
+import { cssVar } from 'antd-style';
+import { HashIcon, MoreHorizontalIcon } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import NavItem from '@/features/NavPanel/components/NavItem';
-import { type ImageGenerationTopic } from '@/types/generation';
+import { useOverlayDropdownPortalProps } from '@/features/NavPanel/OverlayContainer';
+import type { ImageGenerationTopic } from '@/types/generation';
 
 import { useGenerationTopicContext } from '../StoreContext';
 
@@ -17,26 +20,33 @@ interface TopicItemProps {
   isLoading?: boolean;
   isUpdating?: boolean;
   onClick?: () => void;
-  onDelete?: (e: MouseEvent) => void;
   style?: CSSProperties;
   topic: ImageGenerationTopic;
 }
 
 const ListItem = memo<TopicItemProps>(
-  ({ topic, style, isLoading, onClick, onDelete, isActive, isUpdating, contextMenuItems }) => {
+  ({ topic, style, isLoading, onClick, isActive, isUpdating, contextMenuItems }) => {
     const { namespace } = useGenerationTopicContext();
     const { t } = useTranslation(namespace);
+    const dropdownPortalProps = useOverlayDropdownPortalProps();
 
     return (
       <NavItem
-        actions={<ActionIcon icon={Trash} size="small" onClick={onDelete} />}
         active={isActive}
         contextMenuItems={contextMenuItems}
         disabled={isUpdating}
+        icon={
+          <Icon icon={HashIcon} size={'small'} style={{ color: cssVar.colorTextDescription }} />
+        }
         key={topic.id}
         loading={isLoading || isUpdating}
         style={style}
         title={topic.title || t('topic.untitled')}
+        actions={
+          <DropdownMenu items={contextMenuItems} portalProps={dropdownPortalProps}>
+            <ActionIcon icon={MoreHorizontalIcon} size="small" />
+          </DropdownMenu>
+        }
         onClick={onClick}
       />
     );
