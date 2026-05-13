@@ -1,4 +1,6 @@
+import { App } from 'antd';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useVisualMediaUploadAbility } from '@/hooks/useVisualMediaUploadAbility';
 import { useFileStore } from '@/store/file';
@@ -17,6 +19,8 @@ interface UseUploadFilesOptions {
  */
 export const useUploadFiles = (options: UseUploadFilesOptions = {}) => {
   const { model = '', provider = '' } = options;
+  const { t } = useTranslation('chat');
+  const { message } = App.useApp();
 
   const { canUploadImage, canUploadVideo } = useVisualMediaUploadAbility(model, provider);
   const uploadFiles = useFileStore((s) => s.uploadChatFiles);
@@ -30,11 +34,21 @@ export const useUploadFiles = (options: UseUploadFilesOptions = {}) => {
         return true;
       });
 
+      const hasUnsupportedVisualFile = files.some((file) => {
+        if (file.type.startsWith('image')) return !canUploadImage;
+        if (file.type.startsWith('video')) return !canUploadVideo;
+        return false;
+      });
+
+      if (hasUnsupportedVisualFile) {
+        message.warning(t('upload.clientMode.visionNotSupported'));
+      }
+
       if (filteredFiles.length > 0) {
         uploadFiles(filteredFiles);
       }
     },
-    [canUploadImage, canUploadVideo, uploadFiles],
+    [canUploadImage, canUploadVideo, message, t, uploadFiles],
   );
 
   return { canUploadImage, canUploadVideo, handleUploadFiles };

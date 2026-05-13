@@ -13,7 +13,9 @@ import { useFileStore } from '@/store/file';
 export const UPLOAD_CARD_SIZE = 64;
 const ADD_CIRCLE_SIZE = 28;
 
-export type UploadData = string | { dimensions?: { height: number; width: number }; url: string };
+export type UploadData =
+  | string
+  | { dimensions?: { height: number; width: number }; id?: string; url: string };
 
 export const uploadCardStyles = createStaticStyles(({ css }) => ({
   addCircle: css`
@@ -130,6 +132,7 @@ interface UploadCardProps {
   onRemove: () => void;
   onUpload: (data: UploadData) => void;
   style?: CSSProperties;
+  uploading?: boolean;
   variant?: 'card' | 'circle';
 }
 
@@ -143,6 +146,7 @@ const UploadCard = memo<UploadCardProps>(
     className,
     closeClassName,
     style,
+    uploading,
     variant = 'card',
   }) => {
     const inputRef = useRef<HTMLInputElement>(null);
@@ -174,8 +178,8 @@ const UploadCard = memo<UploadCardProps>(
 
           if (result?.url) {
             const data = result.dimensions
-              ? { dimensions: result.dimensions, url: result.url }
-              : result.url;
+              ? { dimensions: result.dimensions, id: result.id, url: result.url }
+              : { id: result.id, url: result.url };
             onUpload(data);
           }
         } finally {
@@ -188,6 +192,7 @@ const UploadCard = memo<UploadCardProps>(
     );
 
     const showPreview = uploadPreview || imageUrl;
+    const showUploading = isUploading || uploading;
 
     const fileInput = (
       <input
@@ -236,13 +241,13 @@ const UploadCard = memo<UploadCardProps>(
                 src={uploadPreview || imageUrl!}
                 style={{ objectFit: 'cover' }}
               />
-              {isUploading && (
+              {showUploading && (
                 <div className={uploadCardStyles.uploadOverlay}>
                   <Spin percent={'auto'} size="small" />
                 </div>
               )}
             </div>
-            {!isUploading && (
+            {!showUploading && (
               <ActionIcon
                 glass
                 className={cx(uploadCardStyles.closeButton, closeClassName, 'upload-card-close')}

@@ -36,14 +36,16 @@ interface InlineImageReferenceProps {
   maxFileSize?: number;
   onAdd: (data: UploadData) => void;
   onRemove: (url: string) => void;
+  uploadingImages?: string[];
 }
 
 const InlineImageReference = memo<InlineImageReferenceProps>(
-  ({ images, onAdd, onRemove, maxFileSize, maxCount = 5 }) => {
+  ({ images, onAdd, onRemove, maxFileSize, maxCount = 5, uploadingImages = [] }) => {
     const [isHovered, setIsHovered] = useState(false);
 
-    const canAddMore = images.length < maxCount;
-    const hasImages = images.length > 0;
+    const totalImages = images.length + uploadingImages.length;
+    const canAddMore = totalImages < maxCount;
+    const hasImages = totalImages > 0;
     const shouldCollapse = hasImages && !isHovered;
 
     return (
@@ -69,6 +71,26 @@ const InlineImageReference = memo<InlineImageReferenceProps>(
           />
         ))}
 
+        {uploadingImages.map((url, index) => {
+          const order = images.length + index;
+
+          return (
+            <UploadCard
+              uploading
+              closeClassName="inline-ref-close"
+              imageUrl={url}
+              key={url}
+              maxFileSize={maxFileSize}
+              style={{
+                marginInlineStart: order > 0 ? (shouldCollapse ? STACK_OFFSET : EXPAND_OFFSET) : 0,
+                zIndex: order + 1,
+              }}
+              onRemove={() => {}}
+              onUpload={onAdd}
+            />
+          );
+        })}
+
         {canAddMore &&
           (shouldCollapse ? (
             <UploadCard
@@ -83,7 +105,7 @@ const InlineImageReference = memo<InlineImageReferenceProps>(
               maxFileSize={maxFileSize}
               style={{
                 marginInlineStart: hasImages ? EXPAND_OFFSET : 0,
-                zIndex: images.length + 1,
+                zIndex: totalImages + 1,
               }}
               onRemove={() => {}}
               onUpload={onAdd}

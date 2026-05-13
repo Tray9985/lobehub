@@ -4,7 +4,7 @@ import { ModelIcon } from '@lobehub/icons';
 import { ActionIcon, Flexbox, Segmented, Text } from '@lobehub/ui';
 import { Divider, Switch } from 'antd';
 import { Images } from 'lucide-react';
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { loginRequired } from '@/components/Error/loginRequiredNotification';
@@ -20,6 +20,7 @@ import {
   GenerationPromptInput,
   InlineImageReference,
 } from '@/routes/(main)/(create)/features/GenerationInput';
+import type { UploadData } from '@/routes/(main)/(create)/features/GenerationInput/UploadCard';
 import {
   CfgSliderInput,
   DimensionControlGroup,
@@ -32,6 +33,7 @@ import {
   useAutoDimensions,
 } from '@/routes/(main)/(create)/image/features/ConfigPanel';
 import ImageModelItem from '@/routes/(main)/(create)/image/features/ConfigPanel/components/ModelSelect/ImageModelItem';
+import { fileService } from '@/services/file';
 import { aiProviderSelectors, useAiInfraStore } from '@/store/aiInfra';
 import { useFileStore } from '@/store/file';
 import { useImageStore } from '@/store/image';
@@ -132,6 +134,8 @@ const PromptInput = ({ showTitle = false }: PromptInputProps) => {
   const { showDimensionControl } = useDimensionControl();
   const { autoSetDimensions, extractUrlAndDimensions } = useAutoDimensions();
   const uploadWithProgress = useFileStore((s) => s.uploadWithProgress);
+  const uploadedImageFileIdsRef = useRef(new Map<string, string>());
+  const [pastedUploadingImages, setPastedUploadingImages] = useState<string[]>([]);
 
   useFetchAiImageConfig();
 
@@ -189,9 +193,13 @@ const PromptInput = ({ showTitle = false }: PromptInputProps) => {
   );
 
   const handleAddImage = useCallback(
-    (data: string | { dimensions?: { height: number; width: number }; url: string }) => {
+    (data: UploadData) => {
       const { url, dimensions } = extractUrlAndDimensions(data);
       if (!url) return;
+
+      if (typeof data !== 'string' && data.id) {
+        uploadedImageFileIdsRef.current.set(url, data.id);
+      }
 
       if (dimensions) {
         autoSetDimensions(dimensions);
@@ -218,11 +226,21 @@ const PromptInput = ({ showTitle = false }: PromptInputProps) => {
   );
 
   const handleRemoveImage = useCallback(
-    (url: string) => {
+    async (url: string) => {
       if (url === imageUrl) {
         setImageUrl(null);
       } else {
         setImageUrls((imageUrls ?? []).filter((item) => item !== url) as any);
+      }
+
+      const fileId = uploadedImageFileIdsRef.current.get(url);
+      if (!fileId) return;
+
+      uploadedImageFileIdsRef.current.delete(url);
+      try {
+        await fileService.removeFile(fileId);
+      } catch (error) {
+        console.error('Failed to delete newly uploaded reference image:', error);
       }
     },
     [imageUrl, imageUrls, setImageUrl, setImageUrls],
@@ -234,15 +252,25 @@ const PromptInput = ({ showTitle = false }: PromptInputProps) => {
   const handlePasteFiles = useCallback(
     async (files: File[]) => {
       for (const file of files) {
-        const result = await uploadWithProgress({
-          file,
-          onStatusUpdate: () => {},
-          skipCheckFileType: true,
-        });
-        if (result?.url) {
-          handleAddImage(
-            result.dimensions ? { dimensions: result.dimensions, url: result.url } : result.url,
-          );
+        const previewUrl = URL.createObjectURL(file);
+        setPastedUploadingImages((items) => [...items, previewUrl]);
+
+        try {
+          const result = await uploadWithProgress({
+            file,
+            onStatusUpdate: () => {},
+            skipCheckFileType: true,
+          });
+          if (result?.url) {
+            handleAddImage(
+              result.dimensions
+                ? { dimensions: result.dimensions, id: result.id, url: result.url }
+                : { id: result.id, url: result.url },
+            );
+          }
+        } finally {
+          URL.revokeObjectURL(previewUrl);
+          setPastedUploadingImages((items) => items.filter((item) => item !== previewUrl));
         }
       }
     },
@@ -272,6 +300,7 @@ const PromptInput = ({ showTitle = false }: PromptInputProps) => {
               images={imagePreviewUrls}
               maxCount={maxCount}
               maxFileSize={imageUrlsMaxFileSize ?? imageUrlMaxFileSize}
+              uploadingImages={pastedUploadingImages}
               onAdd={handleAddImage}
               onRemove={handleRemoveImage}
             />
