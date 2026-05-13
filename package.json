@@ -60,6 +60,7 @@
     "desktop:package:app:platform": "tsx scripts/electronWorkflow/buildElectron.ts",
     "desktop:package:local": "npm run desktop:build:all && npm run package:local --prefix=./apps/desktop",
     "desktop:package:local:reuse": "npm run package:local:reuse --prefix=./apps/desktop",
+    "desktop:package:mac:release": "tsx scripts/electronWorkflow/buildMacRelease.ts",
     "dev": "tsx scripts/devStartupSequence.mts",
     "dev:bun": "bun --bun next dev -p 3010",
     "dev:desktop": "cd apps/desktop && pnpm run dev",

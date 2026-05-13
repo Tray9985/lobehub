@@ -61,6 +61,27 @@ Use `icon-color.svg` for:
 Note: this repository currently includes `public/favicon-32x-32-error.ico`.
 The name looks legacy/irregular, but keep it in sync unless it is removed intentionally.
 
+### Desktop icons
+
+Use the exported `public/icons/icon-512x512.png` as the source when refreshing desktop app icons.
+
+- `apps/desktop/build/Icon.icns` (macOS app, DMG, and Launchpad icon)
+- `apps/desktop/build/icon.png` (generic desktop icon)
+- `apps/desktop/build/icon.ico` (Windows desktop icon)
+- `apps/desktop/resources/tray.png`
+- `apps/desktop/resources/trayTemplate.png`
+
+Channel-specific desktop icons should also stay in sync when the channel branding changes:
+
+- `apps/desktop/build/Icon-beta.icns`
+- `apps/desktop/build/Icon-nightly.icns`
+- `apps/desktop/build/icon-beta.png`
+- `apps/desktop/build/icon-beta.ico`
+- `apps/desktop/build/icon-nightly.png`
+- `apps/desktop/build/icon-nightly.ico`
+- `apps/desktop/build/icon-dev.png`
+- `apps/desktop/build/icon-dev.ico`
+
 ## Entry References Checklist
 
 Confirm these files still point to the expected icon paths:
