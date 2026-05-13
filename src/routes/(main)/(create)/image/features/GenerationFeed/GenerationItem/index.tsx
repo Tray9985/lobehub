@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useDownloadImage } from '@/hooks/useDownloadImage';
 import { useImageStore } from '@/store/image';
-import { imageGenerationConfigSelectors } from '@/store/image/selectors';
+import { createImageSelectors, imageGenerationConfigSelectors } from '@/store/image/selectors';
 import { AsyncTaskStatus } from '@/types/asyncTask';
 import { inferFileExtensionFromImageUrl } from '@/utils/url';
 
@@ -18,6 +18,7 @@ import { type GenerationItemProps } from './types';
 import { getAspectRatio } from './utils';
 
 const isSupportedParamSelector = imageGenerationConfigSelectors.isSupportedParam;
+const isCreatingSelector = createImageSelectors.isCreating;
 
 export const GenerationItem = memo<GenerationItemProps>(
   ({ generationBatch, generation, prompt }) => {
@@ -25,8 +26,10 @@ export const GenerationItem = memo<GenerationItemProps>(
     const { t } = useTranslation('image');
     const useCheckGenerationStatus = useImageStore((s) => s.useCheckGenerationStatus);
     const deleteGeneration = useImageStore((s) => s.removeGeneration);
+    const recreateImage = useImageStore((s) => s.recreateImage);
     const reuseSeed = useImageStore((s) => s.reuseSeed);
     const activeTopicId = useImageStore((s) => s.activeGenerationTopicId);
+    const isRetrying = useImageStore(isCreatingSelector);
     const isSupportSeed = useImageStore(isSupportedParamSelector('seed'));
     const { downloadImage } = useDownloadImage();
 
@@ -104,6 +107,17 @@ export const GenerationItem = memo<GenerationItemProps>(
       }
     }, [generation.task.error, message, t]);
 
+    const handleRetryGenerationBatch = useCallback(async () => {
+      if (isRetrying) return;
+
+      try {
+        await recreateImage(generationBatch.id);
+      } catch (error) {
+        console.error('Failed to recreate generation batch:', error);
+        message.error(t('generation.actions.retryFailed'));
+      }
+    }, [generationBatch.id, isRetrying, message, recreateImage, t]);
+
     // Render corresponding component based on status
     if (generation.task.status === AsyncTaskStatus.Success && generation.asset?.url) {
       const seedTooltip = isSupportSeed
@@ -130,8 +144,10 @@ export const GenerationItem = memo<GenerationItemProps>(
           aspectRatio={aspectRatio}
           generation={generation}
           generationBatch={generationBatch}
+          isRetrying={isRetrying}
           onCopyError={handleCopyError}
           onDelete={handleDeleteGeneration}
+          onRetry={handleRetryGenerationBatch}
         />
       );
     }

@@ -62,6 +62,13 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     }
   `,
 
+  retryButton: css`
+    position: absolute;
+    z-index: 10;
+    inset-block-end: 8px;
+    inset-inline-start: 8px;
+  `,
+
   spinIcon: css`
     color: ${cssVar.colorPrimary};
   `,

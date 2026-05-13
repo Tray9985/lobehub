@@ -1,9 +1,9 @@
 'use client';
 
 import { AgentRuntimeErrorType } from '@lobechat/model-runtime';
-import { Block, Center, Icon, Text } from '@lobehub/ui';
+import { Block, Button, Center, Icon, Text } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
-import { ImageOffIcon } from 'lucide-react';
+import { ImageOffIcon, RotateCcw } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -28,7 +28,7 @@ const providerContentModerationKeyByDefaultMessage = new Map<
 
 // Error state component
 export const ErrorState = memo<ErrorStateProps>(
-  ({ generation, generationBatch, aspectRatio, onDelete, onCopyError }) => {
+  ({ generation, generationBatch, aspectRatio, isRetrying, onDelete, onCopyError, onRetry }) => {
     const { t } = useTranslation('image');
     const { t: tError } = useTranslation('error');
 
@@ -120,6 +120,19 @@ export const ErrorState = memo<ErrorStateProps>(
             </Text>
           )}
         </Center>
+        <Button
+          className={styles.retryButton}
+          icon={RotateCcw}
+          loading={isRetrying}
+          size={'small'}
+          variant={'outlined'}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRetry();
+          }}
+        >
+          {t('generation.actions.retry')}
+        </Button>
         <ActionButtons onDelete={onDelete} />
       </Block>
     );

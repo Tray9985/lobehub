@@ -43,6 +43,8 @@ export default {
   'generation.actions.promptCopied': 'Prompt Copied to Clipboard',
   'generation.actions.promptCopyFailed': 'Failed to Copy Prompt',
   'generation.actions.reuseSettings': 'Reuse Settings',
+  'generation.actions.retry': 'Retry',
+  'generation.actions.retryFailed': 'Failed to Retry Generation',
   'generation.actions.seedApplied': 'Seed Applied to Configuration',
   'generation.actions.seedApplyFailed': 'Failed to Apply Seed',
   'generation.actions.seedCopied': 'Seed Copied to Clipboard',

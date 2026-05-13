@@ -30,8 +30,10 @@ export interface ErrorStateProps {
   aspectRatio: string;
   generation: Generation;
   generationBatch: GenerationBatch;
+  isRetrying?: boolean;
   onCopyError: () => void;
   onDelete: () => void;
+  onRetry: () => void;
 }
 
 export interface LoadingStateProps {

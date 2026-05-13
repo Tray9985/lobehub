@@ -13,6 +13,7 @@ vi.mock('@lobehub/ui', async () => {
     ActionIconGroup: () => React.createElement('div', { 'data-testid': 'action-buttons' }),
     Block: ({ children, onClick, style }: any) =>
       React.createElement('div', { onClick, style }, children),
+    Button: ({ children, onClick }: any) => React.createElement('button', { onClick }, children),
     Center: ({ children }: any) => React.createElement('div', null, children),
     Icon: () => React.createElement('span', { 'data-testid': 'icon' }),
     Text: ({ children }: any) => React.createElement('span', null, children),
@@ -74,6 +75,7 @@ describe('ErrorState', () => {
         generationBatch={generationBatch}
         onCopyError={vi.fn()}
         onDelete={vi.fn()}
+        onRetry={vi.fn()}
       />,
     );
 
@@ -103,6 +105,7 @@ describe('ErrorState', () => {
         generationBatch={generationBatch}
         onCopyError={vi.fn()}
         onDelete={vi.fn()}
+        onRetry={vi.fn()}
       />,
     );
 
