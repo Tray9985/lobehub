@@ -16,7 +16,16 @@ import { useNewVersion } from '@/features/User/UserPanel/useNewVersion';
 import { autoUpdateService } from '@/services/electron/autoUpdate';
 import { useGlobalStore } from '@/store/global';
 
-import { APP_VERSION } from './appVersion';
+import { APP_VERSION, BUILD_COMMIT, BUILD_TIME } from './appVersion';
+
+const formatBuildTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  const pad = (num: number) => num.toString().padStart(2, '0');
+
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())} UTC`;
+};
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
   logo: css`
@@ -40,6 +49,7 @@ const Version = memo<{ mobile?: boolean }>(({ mobile }) => {
 
   const [updaterState, setUpdaterState] = useState<UpdaterState>({ stage: 'idle' });
   const [buildChannel, setBuildChannel] = useState<string | null>(null);
+  const formattedBuildTime = BUILD_TIME ? formatBuildTime(BUILD_TIME) : undefined;
 
   useEffect(() => {
     if (!isDesktop) return;
@@ -136,6 +146,8 @@ const Version = memo<{ mobile?: boolean }>(({ mobile }) => {
           <div style={{ fontSize: 18, fontWeight: 'bolder' }}>{BRANDING_NAME}</div>
           <Flexbox gap={6} horizontal={!mobile}>
             <Tag>v{APP_VERSION}</Tag>
+            {BUILD_COMMIT && <Tag>{t('build.commit', { commit: BUILD_COMMIT })}</Tag>}
+            {formattedBuildTime && <Tag>{t('build.time', { time: formattedBuildTime })}</Tag>}
 
             {buildChannel && buildChannel !== 'stable' && (
               <Tag color={'gold'}>

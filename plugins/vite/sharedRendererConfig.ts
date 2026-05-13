@@ -162,6 +162,12 @@ export function sharedRendererPlugins(options: SharedRendererOptions) {
 }
 
 export function sharedRendererDefine(options: { isElectron: boolean; isMobile: boolean }) {
+  const buildCommit =
+    process.env.NEXT_PUBLIC_BUILD_COMMIT ||
+    process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ||
+    process.env.GITHUB_SHA?.slice(0, 7) ||
+    '';
+  const buildTime = process.env.NEXT_PUBLIC_BUILD_TIME || '';
   const nextPublicDefine = Object.fromEntries(
     Object.entries(process.env)
       .filter(([key]) => key.toUpperCase().startsWith('NEXT_PUBLIC_'))
@@ -172,6 +178,8 @@ export function sharedRendererDefine(options: { isElectron: boolean; isMobile: b
     '__CI__': process.env.CI === 'true' ? 'true' : 'false',
     '__DEV__': process.env.NODE_ENV !== 'production' ? 'true' : 'false',
     '__ELECTRON__': JSON.stringify(options.isElectron),
+    '__BUILD_COMMIT__': JSON.stringify(buildCommit),
+    '__BUILD_TIME__': JSON.stringify(buildTime),
     '__MOBILE__': JSON.stringify(options.isMobile),
     ...nextPublicDefine,
     // Keep a safe fallback so generic `process.env` access won't crash in browser runtime.

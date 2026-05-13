@@ -83,3 +83,11 @@
 **决策**：在图片生成失败卡片左下角增加常驻 `Retry` 按钮。点击后调用现有 `recreateImage`，按 batch 维度重试（删除原 batch 后以原 provider/model/config 重建）。保留右上角原有删除按钮和错误复制行为。
 
 **合并指导**：上游若调整图片生成失败态 UI，应继续保留 “失败卡片左下角常驻重试” 与 “按 batch 重试” 的交互语义，不要改回仅 hover 操作或仅配置复用入口。
+
+### 11. 关于页版本区展示构建元信息
+
+**动机**：个人 Docker 镜像使用 canary 分支长期部署，仅显示应用版本号无法区分具体镜像来自哪个提交、何时构建，不利于排查线上问题。
+
+**决策**：在设置 - 关于 - 版本区的版本号右侧展示构建 commit 和构建时间。GitHub Actions 构建自定义镜像时通过 `NEXT_PUBLIC_BUILD_COMMIT` 与 `NEXT_PUBLIC_BUILD_TIME` 传入，Vite renderer build 注入为前端常量；本地开发或缺失构建信息时不显示空标签。
+
+**合并指导**：上游若调整关于页版本展示、Docker 构建或 Vite renderer define，应继续保留构建 commit / 构建时间的展示和自定义镜像构建参数传递。

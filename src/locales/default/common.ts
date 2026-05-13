@@ -38,6 +38,8 @@ export default {
     'The "Sub-topic" feature is unavailable in the current mode. To use this feature, please switch to Postgres/Pglite DB mode or use LobeHub Cloud.',
   'branchingRequiresSavedTopic':
     'Current topic is not saved, please save it first to use subtopic feature',
+  'build.commit': 'commit {{commit}}',
+  'build.time': 'built {{time}}',
   'cancel': 'Cancel',
   'changelog': 'Changelog',
   'alreadyUpToDate': 'Already Up to Date',

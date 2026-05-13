@@ -42,4 +42,5 @@ jobs:
           platforms: linux/arm64
           tags: ghcr.io/tray9985/lobehub:latest
           build-args: |
-            SHA=${{ steps.build_meta.outputs.commit }}
+            NEXT_PUBLIC_BUILD_COMMIT=${{ steps.build_meta.outputs.commit }}
+            NEXT_PUBLIC_BUILD_TIME=${{ steps.build_meta.outputs.date }}

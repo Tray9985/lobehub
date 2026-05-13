@@ -36,6 +36,12 @@ declare global {
   /** Vite define: running in CI environment (e.g. CI=true) */
   const __CI__: boolean;
 
+  /** Vite define: build commit injected at renderer build time */
+  const __BUILD_COMMIT__: string;
+
+  /** Vite define: build time injected at renderer build time */
+  const __BUILD_TIME__: string;
+
   /** Vite define: development mode (NODE_ENV !== 'production') */
   const __DEV__: boolean;
 
