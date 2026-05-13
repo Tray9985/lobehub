@@ -759,6 +759,7 @@ describe('thread action', () => {
 
     it('should not run if thread not found', async () => {
       const { result } = renderHook(() => useChatStore());
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
       act(() => {
         useChatStore.setState({
@@ -772,6 +773,9 @@ describe('thread action', () => {
       });
 
       expect(chatService.fetchPresetTaskResult).not.toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalledWith('[summaryThreadTitle] skip: thread not found', {
+        threadId: 'thread-id',
+      });
     });
   });
 

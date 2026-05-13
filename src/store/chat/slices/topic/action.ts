@@ -197,7 +197,10 @@ export class ChatTopicActionImpl {
   summaryTopicTitle = async (topicId: string, messages: UIChatMessage[]): Promise<void> => {
     const { internal_updateTopicTitleInSummary, internal_updateTopicLoading } = this.#get();
     const topic = topicSelectors.getTopicById(topicId)(this.#get());
-    if (!topic) return;
+    if (!topic) {
+      console.error('[summaryTopicTitle] skip: topic not found', { topicId });
+      return;
+    }
 
     internal_updateTopicTitleInSummary(topicId, LOADING_FLAT);
 

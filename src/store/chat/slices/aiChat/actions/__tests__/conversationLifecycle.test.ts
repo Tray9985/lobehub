@@ -11,6 +11,7 @@ import * as agentGroupStore from '@/store/agentGroup';
 import { messageMapKey } from '@/store/chat/utils/messageMapKey';
 import { getSessionStoreState } from '@/store/session';
 import * as toolStoreModule from '@/store/tool';
+import { ThreadStatus, ThreadType } from '@/types/topic';
 
 import { useChatStore } from '../../../../store';
 import { createMockAgentConfig, createMockMessage, TEST_CONTENT, TEST_IDS } from './fixtures';
@@ -1002,6 +1003,193 @@ describe('ConversationLifecycle actions', () => {
     });
 
     describe('optimistic topic updatedAt', () => {
+      it('should auto-rename a newly created topic after the first assistant reply finishes', async () => {
+        const { result } = renderHook(() => useChatStore());
+        const topicId = 'new-topic-id';
+        const userMessage = createMockMessage({
+          id: TEST_IDS.USER_MESSAGE_ID,
+          role: 'user',
+          content: TEST_CONTENT.USER_MESSAGE,
+          topicId,
+        });
+        const assistantMessage = createMockMessage({
+          id: TEST_IDS.ASSISTANT_MESSAGE_ID,
+          role: 'assistant',
+          content: 'Final assistant response',
+          topicId,
+        });
+
+        vi.spyOn(aiChatService, 'sendMessageInServer').mockResolvedValue({
+          assistantMessageId: TEST_IDS.ASSISTANT_MESSAGE_ID,
+          isCreateNewTopic: true,
+          messages: [
+            userMessage,
+            createMockMessage({
+              id: TEST_IDS.ASSISTANT_MESSAGE_ID,
+              role: 'assistant',
+              content: '...',
+              topicId,
+            }),
+          ],
+          topicId,
+          topics: { items: [{ id: topicId, title: TEST_CONTENT.USER_MESSAGE }], total: 1 },
+          userMessageId: TEST_IDS.USER_MESSAGE_ID,
+        } as any);
+        const summaryTopicTitleSpy = vi.spyOn(result.current, 'summaryTopicTitle');
+
+        vi.mocked(result.current.executeClientAgent).mockImplementation(
+          async ({ context, onFinish }) => {
+            act(() => {
+              useChatStore.getState().replaceMessages([userMessage, assistantMessage], { context });
+            });
+            await onFinish?.();
+          },
+        );
+
+        await act(async () => {
+          await result.current.sendMessage({
+            message: TEST_CONTENT.USER_MESSAGE,
+            context: createTestContext(),
+          });
+        });
+
+        expect(summaryTopicTitleSpy).toHaveBeenCalledTimes(1);
+        expect(summaryTopicTitleSpy).toHaveBeenCalledWith(topicId, [userMessage, assistantMessage]);
+      });
+
+      it('should not auto-rename existing topics after assistant replies', async () => {
+        const { result } = renderHook(() => useChatStore());
+        const topicId = TEST_IDS.TOPIC_ID;
+
+        vi.spyOn(aiChatService, 'sendMessageInServer').mockResolvedValue({
+          messages: [
+            createMockMessage({ id: TEST_IDS.USER_MESSAGE_ID, role: 'user', topicId }),
+            createMockMessage({ id: TEST_IDS.ASSISTANT_MESSAGE_ID, role: 'assistant', topicId }),
+          ],
+          assistantMessageId: TEST_IDS.ASSISTANT_MESSAGE_ID,
+          topicId,
+          userMessageId: TEST_IDS.USER_MESSAGE_ID,
+        } as any);
+        const summaryTopicTitleSpy = vi.spyOn(result.current, 'summaryTopicTitle');
+
+        vi.mocked(result.current.executeClientAgent).mockImplementation(async ({ onFinish }) => {
+          await onFinish?.();
+        });
+
+        await act(async () => {
+          await result.current.sendMessage({
+            message: TEST_CONTENT.USER_MESSAGE,
+            context: { agentId: TEST_IDS.SESSION_ID, topicId, threadId: null },
+          });
+        });
+
+        expect(summaryTopicTitleSpy).not.toHaveBeenCalled();
+      });
+
+      it('should create a new thread with an initial title and auto-rename it after the first assistant reply finishes', async () => {
+        const { result } = renderHook(() => useChatStore());
+        const topicId = TEST_IDS.TOPIC_ID;
+        const threadId = 'new-thread-id';
+        const sourceMessageId = 'source-message-id';
+        const message = 'Create a thread title from this question';
+        const userMessage = createMockMessage({
+          id: TEST_IDS.USER_MESSAGE_ID,
+          role: 'user',
+          content: message,
+          threadId,
+          topicId,
+        });
+        const assistantMessage = createMockMessage({
+          id: TEST_IDS.ASSISTANT_MESSAGE_ID,
+          role: 'assistant',
+          content: 'Final thread assistant response',
+          threadId,
+          topicId,
+        });
+
+        const sendMessageInServerSpy = vi
+          .spyOn(aiChatService, 'sendMessageInServer')
+          .mockResolvedValue({
+            assistantMessageId: TEST_IDS.ASSISTANT_MESSAGE_ID,
+            createdThreadId: threadId,
+            messages: [
+              userMessage,
+              createMockMessage({
+                id: TEST_IDS.ASSISTANT_MESSAGE_ID,
+                role: 'assistant',
+                content: '...',
+                threadId,
+                topicId,
+              }),
+            ],
+            topicId,
+            userMessageId: TEST_IDS.USER_MESSAGE_ID,
+          } as any);
+        const summaryThreadTitleSpy = vi
+          .spyOn(result.current, 'summaryThreadTitle')
+          .mockResolvedValue(undefined);
+        const refreshThreadsSpy = vi.spyOn(result.current, 'refreshThreads').mockResolvedValue();
+
+        vi.mocked(result.current.executeClientAgent).mockImplementation(
+          async ({ context, onThreadFinish }) => {
+            act(() => {
+              useChatStore.setState({
+                activeTopicId: topicId,
+                threadMaps: {
+                  [topicId]: [
+                    {
+                      createdAt: new Date(),
+                      id: threadId,
+                      lastActiveAt: new Date(),
+                      sourceMessageId,
+                      status: ThreadStatus.Active,
+                      title: message,
+                      topicId,
+                      type: ThreadType.Continuation,
+                      updatedAt: new Date(),
+                      userId: 'user-1',
+                    },
+                  ],
+                },
+              });
+              useChatStore.getState().replaceMessages([userMessage, assistantMessage], { context });
+            });
+            await onThreadFinish?.();
+          },
+        );
+
+        await act(async () => {
+          await result.current.sendMessage({
+            message,
+            context: {
+              agentId: TEST_IDS.SESSION_ID,
+              isNew: true,
+              scope: 'thread',
+              sourceMessageId,
+              threadId: null,
+              threadType: ThreadType.Continuation,
+              topicId,
+            },
+          });
+        });
+
+        expect(sendMessageInServerSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            newThread: {
+              sourceMessageId,
+              title: message.slice(0, 80),
+              type: ThreadType.Continuation,
+            },
+          }),
+          expect.any(AbortController),
+        );
+        expect(refreshThreadsSpy).toHaveBeenCalled();
+        expect(summaryThreadTitleSpy).toHaveBeenCalledWith(threadId, [
+          userMessage,
+          assistantMessage,
+        ]);
+      });
+
       it('should optimistically update topic updatedAt when sending message to existing topic', async () => {
         const { result } = renderHook(() => useChatStore());
         const topicId = TEST_IDS.TOPIC_ID;

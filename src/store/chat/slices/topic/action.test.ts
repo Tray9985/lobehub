@@ -52,6 +52,12 @@ vi.mock('@/services/message', () => ({
   },
 }));
 
+vi.mock('@/services/chat', () => ({
+  chatService: {
+    fetchPresetTaskResult: vi.fn(),
+  },
+}));
+
 vi.mock('@/components/AntdStaticMethods', () => ({
   message: {
     loading: vi.fn(),
@@ -974,6 +980,25 @@ describe('topic action', () => {
     });
   });
   describe('summaryTopicTitle', () => {
+    it('should not throw and should log when topic is missing', async () => {
+      const { result } = renderHook(() => useChatStore());
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const fetchPresetTaskResultSpy = vi.spyOn(chatService, 'fetchPresetTaskResult');
+
+      await act(async () => {
+        await result.current.summaryTopicTitle('missing-topic-id', [
+          { id: 'message-1', content: 'Hello', role: 'user' } as UIChatMessage,
+        ]);
+      });
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[summaryTopicTitle] skip: topic not found', {
+        topicId: 'missing-topic-id',
+      });
+      expect(fetchPresetTaskResultSpy).not.toHaveBeenCalled();
+
+      consoleErrorSpy.mockRestore();
+    });
+
     it('should auto-summarize the topic title and update it', async () => {
       const topicId = 'topic-1';
       const messages = [{ id: 'message-1', content: 'Hello' }] as UIChatMessage[];

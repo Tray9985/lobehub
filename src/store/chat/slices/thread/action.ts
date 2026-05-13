@@ -212,7 +212,10 @@ export class ChatThreadActionImpl {
     const thread = threadSelectors
       .currentTopicThreads(this.#get())
       .find((item) => item.id === threadId);
-    if (!thread) return;
+    if (!thread) {
+      console.error('[summaryThreadTitle] skip: thread not found', { threadId });
+      return;
+    }
 
     internal_updateThreadTitleInSummary(threadId, LOADING_FLAT);
 

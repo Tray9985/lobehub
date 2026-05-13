@@ -176,6 +176,72 @@ describe('StreamingExecutor actions', () => {
       streamSpy.mockRestore();
     });
 
+    it('should call onFinish when agent runtime completes successfully', async () => {
+      act(() => {
+        useChatStore.setState({ executeClientAgent: realExecAgentRuntime });
+      });
+
+      const { result } = renderHook(() => useChatStore());
+      const userMessage = createMockMessage({
+        id: TEST_IDS.USER_MESSAGE_ID,
+        role: 'user',
+        topicId: TEST_IDS.TOPIC_ID,
+      });
+      const finishCallback = vi.fn();
+      const streamSpy = vi
+        .spyOn(chatService, 'createAssistantMessageStream')
+        .mockImplementation(async ({ onFinish }) => {
+          await onFinish?.(TEST_CONTENT.AI_RESPONSE, {} as any);
+        });
+
+      await act(async () => {
+        await result.current.executeClientAgent({
+          context: { agentId: TEST_IDS.SESSION_ID, topicId: TEST_IDS.TOPIC_ID },
+          messages: [userMessage],
+          onFinish: finishCallback,
+          parentMessageId: userMessage.id,
+          parentMessageType: 'user',
+        });
+      });
+
+      expect(finishCallback).toHaveBeenCalledTimes(1);
+
+      streamSpy.mockRestore();
+    });
+
+    it('should call onThreadFinish when agent runtime completes successfully', async () => {
+      act(() => {
+        useChatStore.setState({ executeClientAgent: realExecAgentRuntime });
+      });
+
+      const { result } = renderHook(() => useChatStore());
+      const userMessage = createMockMessage({
+        id: TEST_IDS.USER_MESSAGE_ID,
+        role: 'user',
+        topicId: TEST_IDS.TOPIC_ID,
+      });
+      const threadFinishCallback = vi.fn();
+      const streamSpy = vi
+        .spyOn(chatService, 'createAssistantMessageStream')
+        .mockImplementation(async ({ onFinish }) => {
+          await onFinish?.(TEST_CONTENT.AI_RESPONSE, {} as any);
+        });
+
+      await act(async () => {
+        await result.current.executeClientAgent({
+          context: { agentId: TEST_IDS.SESSION_ID, topicId: TEST_IDS.TOPIC_ID },
+          messages: [userMessage],
+          onThreadFinish: threadFinishCallback,
+          parentMessageId: userMessage.id,
+          parentMessageType: 'user',
+        });
+      });
+
+      expect(threadFinishCallback).toHaveBeenCalledTimes(1);
+
+      streamSpy.mockRestore();
+    });
+
     it('should stop agent runtime loop when operation is cancelled before step execution', async () => {
       act(() => {
         useChatStore.setState({ executeClientAgent: realExecAgentRuntime });
@@ -1978,7 +2044,7 @@ describe('StreamingExecutor actions', () => {
       );
     });
 
-    it('emits client.runtime.complete before returning for queued follow-up messages', async () => {
+    it('calls onFinish and emits client.runtime.complete before returning for queued follow-up messages', async () => {
       vi.useFakeTimers();
 
       const { result } = renderHook(() => useChatStore());
@@ -2004,6 +2070,7 @@ describe('StreamingExecutor actions', () => {
       });
 
       let operationId!: string;
+      const finishCallback = vi.fn();
 
       act(() => {
         const res = result.current.startOperation({
@@ -2032,6 +2099,7 @@ describe('StreamingExecutor actions', () => {
         await result.current.executeClientAgent({
           context: { agentId: TEST_IDS.SESSION_ID, topicId: TEST_IDS.TOPIC_ID },
           messages: [],
+          onFinish: finishCallback,
           parentMessageId: TEST_IDS.USER_MESSAGE_ID,
           parentMessageType: 'user',
           operationId: operationId!,
@@ -2040,6 +2108,7 @@ describe('StreamingExecutor actions', () => {
 
       vi.useRealTimers();
 
+      expect(finishCallback).toHaveBeenCalledTimes(1);
       expect(agentSignalBridgeMock.emitClientAgentSignalSourceEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           payload: expect.objectContaining({
@@ -2188,6 +2257,73 @@ describe('StreamingExecutor actions', () => {
       );
     });
 
+    it('should not call onFinish when state is waiting_for_human', async () => {
+      const { result } = renderHook(() => useChatStore());
+
+      act(() => {
+        useChatStore.setState({
+          executeClientAgent: realExecAgentRuntime,
+        });
+      });
+
+      vi.spyOn(agentConfigResolver, 'resolveAgentConfig').mockReturnValue({
+        agentConfig: createMockAgentConfig(),
+        chatConfig: createMockChatConfig(),
+        isBuiltinAgent: false,
+        plugins: [],
+      });
+
+      let operationId!: string;
+
+      act(() => {
+        const res = result.current.startOperation({
+          type: 'execAgentRuntime',
+          context: { agentId: TEST_IDS.SESSION_ID, topicId: TEST_IDS.TOPIC_ID },
+        });
+        operationId = res.operationId;
+      });
+
+      mockInternalCreateAgentState({
+        state: createMockRuntimeState(operationId, 'waiting_for_human'),
+        context: {
+          phase: 'init',
+          payload: { model: 'gpt-4o-mini', provider: 'openai' },
+          session: {
+            sessionId: TEST_IDS.SESSION_ID,
+            messageCount: 0,
+            status: 'waiting_for_human',
+            stepCount: 1,
+          },
+        },
+        agentConfig: createMockResolvedAgentConfig(),
+      });
+      vi.spyOn(agentRuntime.AgentRuntime.prototype, 'step').mockResolvedValue({
+        events: [],
+        newState: createMockRuntimeState(operationId, 'waiting_for_human'),
+        nextContext: undefined,
+      });
+      const finishCallback = vi.fn();
+      const threadFinishCallback = vi.fn();
+
+      await act(async () => {
+        await result.current.executeClientAgent({
+          context: {
+            agentId: TEST_IDS.SESSION_ID,
+            topicId: TEST_IDS.TOPIC_ID,
+          },
+          messages: [],
+          onFinish: finishCallback,
+          onThreadFinish: threadFinishCallback,
+          parentMessageId: TEST_IDS.USER_MESSAGE_ID,
+          parentMessageType: 'user',
+          operationId,
+        });
+      });
+
+      expect(finishCallback).not.toHaveBeenCalled();
+      expect(threadFinishCallback).not.toHaveBeenCalled();
+    });
+
     it('should fail operation when state is error', async () => {
       const { result } = renderHook(() => useChatStore());
 
@@ -2263,6 +2399,8 @@ describe('StreamingExecutor actions', () => {
         agentConfig: createMockResolvedAgentConfig(),
       });
 
+      const finishCallback = vi.fn();
+
       await act(async () => {
         await result.current.executeClientAgent({
           context: {
@@ -2270,6 +2408,7 @@ describe('StreamingExecutor actions', () => {
             topicId: TEST_IDS.TOPIC_ID,
           },
           messages: [],
+          onFinish: finishCallback,
           parentMessageId: TEST_IDS.USER_MESSAGE_ID,
           parentMessageType: 'user',
           operationId: operationId!,
@@ -2278,6 +2417,7 @@ describe('StreamingExecutor actions', () => {
 
       // Operation should be failed
       expect(result.current.operations[operationId!].status).toBe('failed');
+      expect(finishCallback).not.toHaveBeenCalled();
     });
   });
 

@@ -52,7 +52,12 @@ import { systemStatusSelectors } from '@/store/global/selectors';
 import { type StoreSetter } from '@/store/types';
 import { useUserMemoryStore } from '@/store/userMemory';
 
-import { dbMessageSelectors, displayMessageSelectors, topicSelectors } from '../../../selectors';
+import {
+  dbMessageSelectors,
+  displayMessageSelectors,
+  threadSelectors,
+  topicSelectors,
+} from '../../../selectors';
 import { messageMapKey } from '../../../utils/messageMapKey';
 import { topicMapKey } from '../../../utils/topicMapKey';
 import { AI_RUNTIME_OPERATION_TYPES, type QueuedFile } from '../../operation/types';
@@ -732,6 +737,7 @@ export class ConversationLifecycleActionImpl {
           newThread: newThread
             ? {
                 sourceMessageId: newThread.sourceMessageId,
+                title: message.slice(0, 80),
                 type: newThread.type,
               }
             : undefined,
@@ -871,47 +877,6 @@ export class ConversationLifecycleActionImpl {
 
     if (data.topicId) this.#get().internal_updateTopicLoading(data.topicId, true);
 
-    // Dev-only fast path: fall back to slicing the first user message instead of calling
-    // the LLM. Keeps chat logs uncluttered while still giving the topic a usable title.
-    // Only honored in non-production builds so a misconfigured prod env can't disable it.
-    const shouldSliceTopicTitle = __DEV__ && process.env.NEXT_PUBLIC_DEV_DISABLE_AUTO_TOPIC === '1';
-
-    const applyTopicTitle = async (topicId: string, messages: UIChatMessage[]) => {
-      if (!shouldSliceTopicTitle) {
-        await this.#get().summaryTopicTitle(topicId, messages);
-        return;
-      }
-
-      const firstUserText = messages.find((m) => m.role === 'user')?.content?.trim() ?? '';
-      const title = firstUserText.slice(0, 80) || 'New Topic';
-      await this.#get().internal_updateTopic(topicId, { title });
-      // summaryTopicTitle would normally clear loading via onLoadingChange; do it manually.
-      this.#get().internal_updateTopicLoading(topicId, false);
-      console.info('[dev] sliced topic title (NEXT_PUBLIC_DEV_DISABLE_AUTO_TOPIC=1):', title);
-    };
-
-    const summaryTitle = async () => {
-      // check activeTopic and then auto update topic title
-      if (data.isCreateNewTopic) {
-        await applyTopicTitle(data.topicId, data.messages);
-        return;
-      }
-
-      if (!data.topicId) return;
-
-      const topic = topicSelectors.getTopicById(data.topicId)(this.#get());
-
-      if (topic && !topic.title) {
-        const chats = displayMessageSelectors
-          .getDisplayMessagesByKey(messageMapKey({ agentId, topicId: topic.id }))(this.#get())
-          .filter((item) => item.id !== data.assistantMessageId);
-
-        await applyTopicTitle(topic.id, chats);
-      }
-    };
-
-    summaryTitle().catch(console.error);
-
     // Complete sendMessage operation here - message creation is done
     // execAgentRuntime is a separate operation (child) that handles AI response generation
     this.#get().completeOperation(operationId);
@@ -1013,6 +978,66 @@ export class ConversationLifecycleActionImpl {
           await executeClientAgent({
             context: execContext,
             initialContext: mergedAgentRuntimeInitialContext,
+            onFinish: data.isCreateNewTopic
+              ? async () => {
+                  const topicId = data.topicId;
+                  if (!topicId) return;
+
+                  const chats = displayMessageSelectors
+                    .getDisplayMessagesByKey(messageMapKey(execContext))(this.#get())
+                    .filter((item) => item.role === 'user' || item.role === 'assistant');
+                  const hasAssistantReply = chats.some(
+                    (item) =>
+                      item.role === 'assistant' &&
+                      item.content.trim() &&
+                      item.content !== LOADING_FLAT,
+                  );
+
+                  if (!hasAssistantReply) {
+                    console.error('[summaryTopicTitle] skip: assistant reply is not ready', {
+                      topicId,
+                    });
+                    return;
+                  }
+
+                  await this.#get().summaryTopicTitle(topicId, chats);
+                }
+              : undefined,
+            onThreadFinish: data.createdThreadId
+              ? async () => {
+                  const threadId = data.createdThreadId;
+                  if (!threadId) return;
+
+                  await this.#get().refreshThreads();
+                  const thread = threadSelectors
+                    .currentTopicThreads(this.#get())
+                    .find((item) => item.id === threadId);
+
+                  if (!thread) {
+                    console.error('[summaryThreadTitle] skip: thread not found', { threadId });
+                    return;
+                  }
+
+                  const chats = displayMessageSelectors
+                    .getDisplayMessagesByKey(messageMapKey(execContext))(this.#get())
+                    .filter((item) => item.role === 'user' || item.role === 'assistant');
+                  const hasAssistantReply = chats.some(
+                    (item) =>
+                      item.role === 'assistant' &&
+                      item.content.trim() &&
+                      item.content !== LOADING_FLAT,
+                  );
+
+                  if (!hasAssistantReply) {
+                    console.error('[summaryThreadTitle] skip: assistant reply is not ready', {
+                      threadId,
+                    });
+                    return;
+                  }
+
+                  await this.#get().summaryThreadTitle(threadId, chats);
+                }
+              : undefined,
             messages: displayMessages,
             parentMessageId: data.assistantMessageId,
             parentMessageType: 'assistant',

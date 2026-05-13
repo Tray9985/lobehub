@@ -475,6 +475,8 @@ export class StreamingExecutorActionImpl {
     inPortalThread?: boolean;
     messages: UIChatMessage[];
     operationId?: string;
+    onFinish?: () => Promise<void> | void;
+    onThreadFinish?: () => Promise<void> | void;
     parentMessageId: string;
     parentMessageType: 'user' | 'assistant' | 'tool';
     parentOperationId?: string;
@@ -827,6 +829,20 @@ export class StreamingExecutorActionImpl {
       stepCount,
     );
 
+    const runOnFinish = async () => {
+      try {
+        await params.onFinish?.();
+      } catch (error) {
+        console.error('[executeClientAgent] onFinish callback error:', error);
+      }
+
+      try {
+        await params.onThreadFinish?.();
+      } catch (error) {
+        console.error('[executeClientAgent] onThreadFinish callback error:', error);
+      }
+    };
+
     // Execute afterCompletion hooks before completing operation
     // These are registered by tools (e.g., speak/broadcast/delegate) that need to
     // trigger actions after the AgentRuntime finishes
@@ -852,6 +868,8 @@ export class StreamingExecutorActionImpl {
     // If completed successfully and queue has messages, drain and trigger new sendMessage.
     // Only drain on success — on error the queue is left intact so messages aren't lost.
     if (state.status === 'done') {
+      await runOnFinish();
+
       const remainingQueued = this.#get().drainQueuedMessages(contextKey);
       if (remainingQueued.length > 0) {
         const merged = mergeQueuedMessages(remainingQueued);

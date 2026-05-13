@@ -1,7 +1,6 @@
 'use client';
 
 import { Flexbox } from '@lobehub/ui';
-import { t } from 'i18next';
 import { memo, Suspense, useCallback, useMemo } from 'react';
 
 import { type ConversationContext, type ConversationHooks } from '@/features/Conversation';
@@ -16,7 +15,7 @@ import {
 import SkeletonList from '@/features/Conversation/components/SkeletonList';
 import { useOperationState } from '@/hooks/useOperationState';
 import { useChatStore } from '@/store/chat';
-import { portalThreadSelectors, threadSelectors } from '@/store/chat/selectors';
+import { portalThreadSelectors } from '@/store/chat/selectors';
 import { type MessageMapKeyInput } from '@/store/chat/utils/messageMapKey';
 import { messageMapKey } from '@/store/chat/utils/messageMapKey';
 
@@ -200,17 +199,6 @@ const ThreadChat = memo(() => {
         await state.refreshMessages();
         // Open the newly created thread in portal
         state.openThreadInPortal(createdThreadId, threadStartMessageId);
-
-        const newThread = threadSelectors
-          .currentTopicThreads(useChatStore.getState())
-          .find((item) => item.id === createdThreadId);
-        if (!newThread) return;
-
-        const defaultTitle = t('thread.title', { ns: 'chat' });
-        const shouldAutoRename = !newThread.title?.trim() || newThread.title === defaultTitle;
-        if (!shouldAutoRename) return;
-
-        await state.autoRenameThreadTitle(createdThreadId);
       },
     }),
     [threadStartMessageId],
