@@ -11,8 +11,7 @@ const log = debug('lobe-file:proxy');
 type Params = Promise<{ id: string }>;
 
 const FILE_PROXY_KEY_PREFIX = 'file-proxy:';
-// Cache presigned URL for 4 minutes (URL expires in 5 minutes)
-const PRESIGNED_URL_CACHE_TTL = 240;
+const REDIRECT_URL_CACHE_TTL = 3600;
 
 const buildCacheKey = (id: string) => `${FILE_PROXY_KEY_PREFIX}${id}`;
 
@@ -26,8 +25,8 @@ interface CachedFileData {
  *
  * Features:
  * - Query database to get file record (without userId filter for public access)
- * - Generate access URL based on platform (desktop → local file, web → S3 presigned URL)
- * - Cache presigned URL in Redis to reduce S3 API calls
+ * - Redirect to the configured public file URL
+ * - Cache redirect URL in Redis to reduce database lookups
  * - Return 302 redirect
  */
 export const GET = async (_req: Request, segmentData: { params: Params }) => {
@@ -68,16 +67,15 @@ export const GET = async (_req: Request, segmentData: { params: Params }) => {
     // Create file service with file owner's userId
     const fileService = new FileService(db, file.userId);
 
-    // Web: Generate S3 presigned URL (5 minutes expiry)
-    const redirectUrl = await fileService.createPreSignedUrlForPreview(file.url, 300);
-    log('Web S3 presigned URL generated (expires in 5 min)');
+    const redirectUrl = await fileService.getFullFileUrl(file.url);
+    log('Public file URL generated for redirect');
 
-    // Cache the presigned URL in Redis
+    // Cache the redirect URL in Redis
     if (redisClient) {
       await redisClient.set(cacheKey, JSON.stringify({ redirectUrl }), {
-        ex: PRESIGNED_URL_CACHE_TTL,
+        ex: REDIRECT_URL_CACHE_TTL,
       });
-      log('Cached presigned URL for file: %s (TTL: %ds)', id, PRESIGNED_URL_CACHE_TTL);
+      log('Cached redirect URL for file: %s (TTL: %ds)', id, REDIRECT_URL_CACHE_TTL);
     }
 
     // Return 302 redirect

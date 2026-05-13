@@ -124,9 +124,9 @@ describe('imageRouter', () => {
     mockChargeBeforeGenerate.mockResolvedValue(undefined);
     mockGetKeyFromFullUrl.mockResolvedValue(null);
     mockGetFullFileUrl.mockResolvedValue(null);
-    mockGetExternalFileUrl.mockImplementation(async (url: string) => `signed:${url}`);
+    mockGetExternalFileUrl.mockImplementation(async (url: string) => `public:${url}`);
     mockGetExternalFileUrls.mockImplementation(async (urls: string[]) =>
-      urls.map((url) => `signed:${url}`),
+      urls.map((url) => `public:${url}`),
     );
 
     // Setup default transaction mock
@@ -361,9 +361,11 @@ describe('imageRouter', () => {
       );
     });
 
-    it('should send external signed imageUrl while keeping database config as key', async () => {
+    it('should send external public imageUrl while keeping database config as key', async () => {
       mockGetKeyFromFullUrl.mockResolvedValue('files/single-image.jpg');
-      mockGetExternalFileUrl.mockResolvedValue('https://s3.example.com/single-image-signed');
+      mockGetExternalFileUrl.mockResolvedValue(
+        'https://resource.example.com/files/single-image.jpg',
+      );
 
       const ctx = createMockCtx();
       const input = createDefaultInput({
@@ -381,26 +383,26 @@ describe('imageRouter', () => {
         expect.objectContaining({
           configForDatabase: expect.objectContaining({ imageUrl: 'files/single-image.jpg' }),
           generationParams: expect.objectContaining({
-            imageUrl: 'https://s3.example.com/single-image-signed',
+            imageUrl: 'https://resource.example.com/files/single-image.jpg',
           }),
         }),
       );
       expect(mockAsyncCallerCreateImage).toHaveBeenCalledWith(
         expect.objectContaining({
           params: expect.objectContaining({
-            imageUrl: 'https://s3.example.com/single-image-signed',
+            imageUrl: 'https://resource.example.com/files/single-image.jpg',
           }),
         }),
       );
     });
 
-    it('should send external signed imageUrls while keeping database config as keys', async () => {
+    it('should send external public imageUrls while keeping database config as keys', async () => {
       mockGetKeyFromFullUrl
         .mockResolvedValueOnce('files/image1.jpg')
         .mockResolvedValueOnce('files/image2.jpg');
       mockGetExternalFileUrls.mockResolvedValue([
-        'https://s3.example.com/image1-signed',
-        'https://s3.example.com/image2-signed',
+        'https://resource.example.com/files/image1.jpg',
+        'https://resource.example.com/files/image2.jpg',
       ]);
 
       const ctx = createMockCtx();
@@ -425,8 +427,8 @@ describe('imageRouter', () => {
           }),
           generationParams: expect.objectContaining({
             imageUrls: [
-              'https://s3.example.com/image1-signed',
-              'https://s3.example.com/image2-signed',
+              'https://resource.example.com/files/image1.jpg',
+              'https://resource.example.com/files/image2.jpg',
             ],
           }),
         }),

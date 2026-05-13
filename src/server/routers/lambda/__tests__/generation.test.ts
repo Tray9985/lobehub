@@ -178,13 +178,13 @@ describe('generationRouter', () => {
   });
 
   describe('deleteGeneration', () => {
-    it('should delete generation with thumbnail', async () => {
+    it('should delete generation asset files', async () => {
       const mockDeletedGeneration = {
         id: 'gen-1',
-        asset: { thumbnailUrl: 'thumb-key' },
+        asset: { thumbnailUrl: 'thumb-key', url: 'main-key' },
       };
       const mockDelete = vi.fn().mockResolvedValue(mockDeletedGeneration);
-      const mockDeleteFile = vi.fn().mockResolvedValue(true);
+      const mockDeleteFiles = vi.fn().mockResolvedValue(true);
 
       vi.mocked(GenerationModel).mockImplementation(
         () =>
@@ -195,7 +195,7 @@ describe('generationRouter', () => {
       vi.mocked(FileService).mockImplementation(
         () =>
           ({
-            deleteFile: mockDeleteFile,
+            deleteFiles: mockDeleteFiles,
           }) as any,
       );
 
@@ -205,16 +205,16 @@ describe('generationRouter', () => {
 
       expect(result).toEqual(mockDeletedGeneration);
       expect(mockDelete).toHaveBeenCalledWith('gen-1');
-      expect(mockDeleteFile).toHaveBeenCalledWith('thumb-key');
+      expect(mockDeleteFiles).toHaveBeenCalledWith(['main-key', 'thumb-key']);
     });
 
-    it('should delete generation without thumbnail', async () => {
+    it('should delete generation main asset when thumbnail is absent', async () => {
       const mockDeletedGeneration = {
         id: 'gen-1',
-        asset: { url: 'main-url' },
+        asset: { url: 'main-key' },
       };
       const mockDelete = vi.fn().mockResolvedValue(mockDeletedGeneration);
-      const mockDeleteFile = vi.fn().mockResolvedValue(true);
+      const mockDeleteFiles = vi.fn().mockResolvedValue(true);
 
       vi.mocked(GenerationModel).mockImplementation(
         () =>
@@ -225,7 +225,7 @@ describe('generationRouter', () => {
       vi.mocked(FileService).mockImplementation(
         () =>
           ({
-            deleteFile: mockDeleteFile,
+            deleteFiles: mockDeleteFiles,
           }) as any,
       );
 
@@ -235,12 +235,41 @@ describe('generationRouter', () => {
 
       expect(result).toEqual(mockDeletedGeneration);
       expect(mockDelete).toHaveBeenCalledWith('gen-1');
-      expect(mockDeleteFile).not.toHaveBeenCalled();
+      expect(mockDeleteFiles).toHaveBeenCalledWith(['main-key']);
+    });
+
+    it('should delete video cover when generation has video asset', async () => {
+      const mockDeletedGeneration = {
+        id: 'gen-1',
+        asset: { coverUrl: 'cover-key', thumbnailUrl: 'thumb-key', url: 'video-key' },
+      };
+      const mockDelete = vi.fn().mockResolvedValue(mockDeletedGeneration);
+      const mockDeleteFiles = vi.fn().mockResolvedValue(true);
+
+      vi.mocked(GenerationModel).mockImplementation(
+        () =>
+          ({
+            delete: mockDelete,
+          }) as any,
+      );
+      vi.mocked(FileService).mockImplementation(
+        () =>
+          ({
+            deleteFiles: mockDeleteFiles,
+          }) as any,
+      );
+
+      const caller = generationRouter.createCaller(mockCtx);
+
+      const result = await caller.deleteGeneration({ generationId: 'gen-1' });
+
+      expect(result).toEqual(mockDeletedGeneration);
+      expect(mockDeleteFiles).toHaveBeenCalledWith(['video-key', 'thumb-key', 'cover-key']);
     });
 
     it('should handle when generation not found', async () => {
       const mockDelete = vi.fn().mockResolvedValue(null);
-      const mockDeleteFile = vi.fn().mockResolvedValue(true);
+      const mockDeleteFiles = vi.fn().mockResolvedValue(true);
 
       vi.mocked(GenerationModel).mockImplementation(
         () =>
@@ -251,7 +280,7 @@ describe('generationRouter', () => {
       vi.mocked(FileService).mockImplementation(
         () =>
           ({
-            deleteFile: mockDeleteFile,
+            deleteFiles: mockDeleteFiles,
           }) as any,
       );
 
@@ -261,7 +290,7 @@ describe('generationRouter', () => {
 
       expect(result).toBeUndefined();
       expect(mockDelete).toHaveBeenCalledWith('gen-1');
-      expect(mockDeleteFile).not.toHaveBeenCalled();
+      expect(mockDeleteFiles).not.toHaveBeenCalled();
     });
   });
 });

@@ -26,7 +26,7 @@ vi.mock('@/server/services/message', () => ({
 
 vi.mock('@/server/services/file', () => ({
   FileService: vi.fn().mockImplementation(() => ({
-    getExternalFileUrl: vi.fn(async (path: string | null) => (path ? `signed:${path}` : '')),
+    getExternalFileUrl: vi.fn(async (path: string | null) => (path ? `public:${path}` : '')),
     getFullFileUrl: vi.fn(async (path: string | null) => path || ''),
   })),
 }));

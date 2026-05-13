@@ -21,7 +21,7 @@ vi.mock('@/server/modules/ModelRuntime', () => ({
 
 vi.mock('@/server/services/file', () => ({
   FileService: vi.fn(() => ({
-    getExternalFileUrl: vi.fn(async (url: string) => `signed:${url}`),
+    getExternalFileUrl: vi.fn(async (url: string) => `public:${url}`),
   })),
 }));
 
@@ -157,12 +157,12 @@ describe('POST handler', () => {
               content: [
                 { text: 'Please inspect these files', type: 'text' },
                 {
-                  image_url: { detail: 'auto', url: 'signed:https://lobehub.com/f/image-file' },
+                  image_url: { detail: 'auto', url: 'public:https://lobehub.com/f/image-file' },
                   type: 'image_url',
                 },
                 {
                   type: 'video_url',
-                  video_url: { url: 'signed:https://lobehub.com/f/video-file' },
+                  video_url: { url: 'public:https://lobehub.com/f/video-file' },
                 },
               ],
             }),

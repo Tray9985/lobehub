@@ -37,14 +37,16 @@ export const generationRouter = router({
 
       if (!deletedGeneration) return;
 
-      // Note: Based on new requirements, don't delete main file (fileId), only delete thumbnail
-      // If generation has a thumbnail, delete it from S3
       if (deletedGeneration.asset) {
-        const asset = deletedGeneration.asset as any;
+        const asset = deletedGeneration.asset as Generation['asset'];
+        const filesToDelete = [
+          asset?.url,
+          asset?.thumbnailUrl,
+          asset && 'coverUrl' in asset ? asset.coverUrl : undefined,
+        ].filter(Boolean) as string[];
 
-        // Only delete thumbnail URL if exists
-        if (asset.thumbnailUrl) {
-          await ctx.fileService.deleteFile(asset.thumbnailUrl);
+        if (filesToDelete.length > 0) {
+          await ctx.fileService.deleteFiles(filesToDelete);
         }
       }
 

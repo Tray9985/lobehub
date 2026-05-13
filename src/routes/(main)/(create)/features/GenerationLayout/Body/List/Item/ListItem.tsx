@@ -35,17 +35,19 @@ const ListItem = memo<TopicItemProps>(
         active={isActive}
         contextMenuItems={contextMenuItems}
         disabled={isUpdating}
-        icon={
-          <Icon icon={HashIcon} size={'small'} style={{ color: cssVar.colorTextDescription }} />
-        }
         key={topic.id}
         loading={isLoading || isUpdating}
         style={style}
         title={topic.title || t('topic.untitled')}
         actions={
-          <DropdownMenu items={contextMenuItems} portalProps={dropdownPortalProps}>
-            <ActionIcon icon={MoreHorizontalIcon} size="small" />
-          </DropdownMenu>
+          contextMenuItems ? (
+            <DropdownMenu items={contextMenuItems} portalProps={dropdownPortalProps}>
+              <ActionIcon icon={MoreHorizontalIcon} size="small" />
+            </DropdownMenu>
+          ) : undefined
+        }
+        icon={
+          <Icon icon={HashIcon} size={'small'} style={{ color: cssVar.colorTextDescription }} />
         }
         onClick={onClick}
       />

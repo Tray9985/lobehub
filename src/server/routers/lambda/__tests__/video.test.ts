@@ -146,9 +146,9 @@ describe('videoRouter', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetExternalFileUrl.mockImplementation(async (url: string) => `signed:${url}`);
+    mockGetExternalFileUrl.mockImplementation(async (url: string) => `public:${url}`);
     mockGetExternalFileUrls.mockImplementation(async (urls: string[]) =>
-      urls.map((url) => `signed:${url}`),
+      urls.map((url) => `public:${url}`),
     );
     mockGetKeyFromFullUrl.mockResolvedValue(null);
     mockResolveBusinessModelMapping.mockImplementation(
@@ -285,14 +285,14 @@ describe('videoRouter', () => {
   });
 
   describe('createVideo - outbound media URLs', () => {
-    it('should send external signed image urls while preserving database keys', async () => {
+    it('should send external public image urls while preserving database keys', async () => {
       setupMocks();
       mockGetKeyFromFullUrl
         .mockResolvedValueOnce('files/start.png')
         .mockResolvedValueOnce('files/end.png');
       mockGetExternalFileUrl
-        .mockResolvedValueOnce('https://s3.example.com/start-signed')
-        .mockResolvedValueOnce('https://s3.example.com/end-signed');
+        .mockResolvedValueOnce('https://resource.example.com/files/start.png')
+        .mockResolvedValueOnce('https://resource.example.com/files/end.png');
       mockCreateVideo.mockResolvedValue({ inferenceId: 'inf-signed', useWebhook: true });
 
       const caller = videoRouter.createCaller(mockCtx);
@@ -310,8 +310,8 @@ describe('videoRouter', () => {
       expect(mockCreateVideo).toHaveBeenCalledWith(
         expect.objectContaining({
           params: expect.objectContaining({
-            imageUrl: 'https://s3.example.com/start-signed',
-            endImageUrl: 'https://s3.example.com/end-signed',
+            imageUrl: 'https://resource.example.com/files/start.png',
+            endImageUrl: 'https://resource.example.com/files/end.png',
           }),
         }),
         expect.any(Object),

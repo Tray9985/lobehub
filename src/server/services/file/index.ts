@@ -84,7 +84,8 @@ export class FileService {
 
   /**
    * Resolve file references for outbound provider/LLM payloads.
-   * Internal proxy URLs stay internal; external callers receive short-lived S3-compatible URLs.
+   * LobeHub managed files use the same public URL policy as UI previews;
+   * third-party URLs stay unchanged.
    */
   public async getExternalFileUrl(
     url?: string | null,
@@ -98,7 +99,7 @@ export class FileService {
       const key = await this.getKeyFromFullUrl(new URL(url, appEnv.APP_URL).toString());
       if (!key) throw new Error(`File key not found from proxy url: ${url}`);
 
-      return this.createPreSignedUrlForPreview(key, expiresIn);
+      return this.getFullFileUrl(key, expiresIn);
     }
 
     if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -112,10 +113,10 @@ export class FileService {
       const key = await this.getKeyFromFullUrl(url);
       if (!key) throw new Error(`File key not found from proxy url: ${url}`);
 
-      return this.createPreSignedUrlForPreview(key, expiresIn);
+      return this.getFullFileUrl(key, expiresIn);
     }
 
-    return this.createPreSignedUrlForPreview(url, expiresIn);
+    return this.getFullFileUrl(url, expiresIn);
   }
 
   public async getExternalFileUrls(

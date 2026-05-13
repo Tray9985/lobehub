@@ -60,13 +60,13 @@
 
 **合并指导**：上游若调整模型列表头部操作，应保留该常驻批量开关能力，并继续让作用范围跟随当前模型 tab。
 
-### 8. 外发给 LLM / Provider 的站内资源使用 1 小时短时 URL
+### 8. UI 展示和外发资源统一使用公开资源域名
 
-**动机**：个人部署使用 Cloudflare Zero Trust 保护站点，内部文件访问统一走 `/f/:id`。当图片 / 视频参考资源被发送给外部 LLM 或 Provider 时，上游无法通过 Zero Trust 访问 `/f/:id`，会拿到 HTML 登录页或挑战页，导致多模态请求失败。同时不希望将 R2 / S3-compatible 桶设置为公开读，避免敏感生成图片或上传资源长期暴露。
+**动机**：个人部署已为 R2 配置公开资源域名 `S3_PUBLIC_DOMAIN`，并接受 “知道 URL 即可访问、但路径不可猜” 的资源访问模型。此前外发给 LLM / Provider 的站内资源使用 1 小时 S3-compatible 预签名 GET URL，历史上下文几小时后复用图片会因签名过期失败。
 
-**决策**：数据库、前端展示、历史消息和内部 `/f/:id` 逻辑保持不变；仅在构造发送给外部 LLM / Provider 的 runtime payload 前，将本站 `/f/:id` 或存储 key 转换成 1 小时有效的 S3-compatible 预签名 GET URL。外部 URL 和 data URL 保持原样。普通文件仍以内容注入为主，不默认暴露下载 URL。
+**决策**：数据库仍只存储文件 key 或 `/f/:id` 对应的数据库记录，不持久化完整公开 URL。UI 展示、`/f/:id` 跳转、外发给 LLM / Provider 的 LobeHub 托管资源统一解析为 `S3_PUBLIC_DOMAIN/<key>`。第三方 URL 和 data URL 保持原样；上传仍使用预签名 PUT URL。
 
-**合并指导**：上游若调整图片生成、视频生成、聊天多模态或 Agent Runtime 的文件 URL 处理，应继续保留 “内部 URL / 存储 key 不持久化短时 URL，只在外发 payload 中签发 1 小时短链” 的边界。不要改为 R2 公有读，也不要把预签名 URL 写入数据库。
+**合并指导**：上游若调整文件 URL、图片 / 视频生成参考图、聊天多模态或 Agent Runtime 的资源处理，应继续保留 “托管资源读取和外发统一使用 `S3_PUBLIC_DOMAIN`，不再生成读取用预签名 URL” 的边界。不要把 UI 或外发链路改回 `X-Amz-*` 短时签名 URL。
 
 ### 9. 图片 / 视频生成主题列表使用纯标题样式
 
