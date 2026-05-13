@@ -877,6 +877,11 @@ export class ConversationLifecycleActionImpl {
 
     if (data.topicId) this.#get().internal_updateTopicLoading(data.topicId, true);
 
+    const titleUserMessage = data.messages.find((item) => item.id === data.userMessageId);
+    const titleSummaryMessages = titleUserMessage
+      ? [{ ...titleUserMessage, content: message }]
+      : [];
+
     // Complete sendMessage operation here - message creation is done
     // execAgentRuntime is a separate operation (child) that handles AI response generation
     this.#get().completeOperation(operationId);
@@ -982,25 +987,9 @@ export class ConversationLifecycleActionImpl {
               ? async () => {
                   const topicId = data.topicId;
                   if (!topicId) return;
+                  if (titleSummaryMessages.length === 0) return;
 
-                  const chats = displayMessageSelectors
-                    .getDisplayMessagesByKey(messageMapKey(execContext))(this.#get())
-                    .filter((item) => item.role === 'user' || item.role === 'assistant');
-                  const hasAssistantReply = chats.some(
-                    (item) =>
-                      item.role === 'assistant' &&
-                      item.content.trim() &&
-                      item.content !== LOADING_FLAT,
-                  );
-
-                  if (!hasAssistantReply) {
-                    console.error('[summaryTopicTitle] skip: assistant reply is not ready', {
-                      topicId,
-                    });
-                    return;
-                  }
-
-                  await this.#get().summaryTopicTitle(topicId, chats);
+                  await this.#get().summaryTopicTitle(topicId, titleSummaryMessages);
                 }
               : undefined,
             onThreadFinish: data.createdThreadId
@@ -1018,24 +1007,9 @@ export class ConversationLifecycleActionImpl {
                     return;
                   }
 
-                  const chats = displayMessageSelectors
-                    .getDisplayMessagesByKey(messageMapKey(execContext))(this.#get())
-                    .filter((item) => item.role === 'user' || item.role === 'assistant');
-                  const hasAssistantReply = chats.some(
-                    (item) =>
-                      item.role === 'assistant' &&
-                      item.content.trim() &&
-                      item.content !== LOADING_FLAT,
-                  );
+                  if (titleSummaryMessages.length === 0) return;
 
-                  if (!hasAssistantReply) {
-                    console.error('[summaryThreadTitle] skip: assistant reply is not ready', {
-                      threadId,
-                    });
-                    return;
-                  }
-
-                  await this.#get().summaryThreadTitle(threadId, chats);
+                  await this.#get().summaryThreadTitle(threadId, titleSummaryMessages);
                 }
               : undefined,
             messages: displayMessages,

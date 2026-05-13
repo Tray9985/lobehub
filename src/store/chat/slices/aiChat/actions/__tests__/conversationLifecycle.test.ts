@@ -1003,7 +1003,7 @@ describe('ConversationLifecycle actions', () => {
     });
 
     describe('optimistic topic updatedAt', () => {
-      it('should auto-rename a newly created topic after the first assistant reply finishes', async () => {
+      it('should auto-rename a newly created topic after finish using only the user prompt', async () => {
         const { result } = renderHook(() => useChatStore());
         const topicId = 'new-topic-id';
         const userMessage = createMockMessage({
@@ -1015,7 +1015,7 @@ describe('ConversationLifecycle actions', () => {
         const assistantMessage = createMockMessage({
           id: TEST_IDS.ASSISTANT_MESSAGE_ID,
           role: 'assistant',
-          content: 'Final assistant response',
+          content: '',
           topicId,
         });
 
@@ -1054,7 +1054,7 @@ describe('ConversationLifecycle actions', () => {
         });
 
         expect(summaryTopicTitleSpy).toHaveBeenCalledTimes(1);
-        expect(summaryTopicTitleSpy).toHaveBeenCalledWith(topicId, [userMessage, assistantMessage]);
+        expect(summaryTopicTitleSpy).toHaveBeenCalledWith(topicId, [userMessage]);
       });
 
       it('should not auto-rename existing topics after assistant replies', async () => {
@@ -1086,7 +1086,7 @@ describe('ConversationLifecycle actions', () => {
         expect(summaryTopicTitleSpy).not.toHaveBeenCalled();
       });
 
-      it('should create a new thread with an initial title and auto-rename it after the first assistant reply finishes', async () => {
+      it('should create a new thread with an initial title and auto-rename it after finish using only the user prompt', async () => {
         const { result } = renderHook(() => useChatStore());
         const topicId = TEST_IDS.TOPIC_ID;
         const threadId = 'new-thread-id';
@@ -1102,7 +1102,7 @@ describe('ConversationLifecycle actions', () => {
         const assistantMessage = createMockMessage({
           id: TEST_IDS.ASSISTANT_MESSAGE_ID,
           role: 'assistant',
-          content: 'Final thread assistant response',
+          content: '',
           threadId,
           topicId,
         });
@@ -1184,10 +1184,7 @@ describe('ConversationLifecycle actions', () => {
           expect.any(AbortController),
         );
         expect(refreshThreadsSpy).toHaveBeenCalled();
-        expect(summaryThreadTitleSpy).toHaveBeenCalledWith(threadId, [
-          userMessage,
-          assistantMessage,
-        ]);
+        expect(summaryThreadTitleSpy).toHaveBeenCalledWith(threadId, [userMessage]);
       });
 
       it('should optimistically update topic updatedAt when sending message to existing topic', async () => {
