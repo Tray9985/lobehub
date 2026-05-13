@@ -31,6 +31,8 @@ const alias = {
 
 export default defineConfig({
   define: {
+    '__BUILD_COMMIT__': JSON.stringify(process.env.NEXT_PUBLIC_BUILD_COMMIT ?? ''),
+    '__BUILD_TIME__': JSON.stringify(process.env.NEXT_PUBLIC_BUILD_TIME ?? ''),
     '__CI__': process.env.CI === 'true' ? 'true' : 'false',
     '__DEV__': process.env.NODE_ENV !== 'production' ? 'true' : 'false',
     '__ELECTRON__': 'false',
