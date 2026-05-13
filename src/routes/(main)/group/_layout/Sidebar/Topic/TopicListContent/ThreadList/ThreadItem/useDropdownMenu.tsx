@@ -1,7 +1,7 @@
 import { type MenuProps } from '@lobehub/ui';
 import { Icon } from '@lobehub/ui';
 import { App } from 'antd';
-import { PencilLine, Trash } from 'lucide-react';
+import { PencilLine, Trash, Wand2 } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -16,13 +16,24 @@ export const useThreadItemDropdownMenu = ({
   id,
   toggleEditing,
 }: ThreadItemDropdownMenuProps): (() => MenuProps['items']) => {
-  const { t } = useTranslation(['thread', 'common']);
+  const { t } = useTranslation(['thread', 'topic', 'common']);
   const { modal } = App.useApp();
 
-  const [removeThread] = useChatStore((s) => [s.removeThread]);
+  const [autoRenameThreadTitle, removeThread] = useChatStore((s) => [
+    s.autoRenameThreadTitle,
+    s.removeThread,
+  ]);
 
   return useCallback(() => {
     return [
+      {
+        icon: <Icon icon={Wand2} />,
+        key: 'autoRename',
+        label: t('actions.autoRename', { ns: 'topic' }),
+        onClick: () => {
+          autoRenameThreadTitle(id);
+        },
+      },
       {
         icon: <Icon icon={PencilLine} />,
         key: 'rename',
@@ -51,5 +62,5 @@ export const useThreadItemDropdownMenu = ({
         },
       },
     ].filter(Boolean) as MenuProps['items'];
-  }, [id, removeThread, toggleEditing, t, modal]);
+  }, [autoRenameThreadTitle, id, removeThread, toggleEditing, t, modal]);
 };

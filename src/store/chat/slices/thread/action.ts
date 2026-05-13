@@ -12,6 +12,7 @@ import { type SWRResponse } from 'swr';
 
 import { mutate, useClientDataSWR } from '@/libs/swr';
 import { chatService } from '@/services/chat';
+import { messageService } from '@/services/message';
 import { threadService } from '@/services/thread';
 import { threadSelectors } from '@/store/chat/selectors';
 import { type ChatStore } from '@/store/chat/store';
@@ -181,10 +182,37 @@ export class ChatThreadActionImpl {
     await this.#get().internal_updateThread(id, { title });
   };
 
+  autoRenameThreadTitle = async (id: string): Promise<void> => {
+    const {
+      activeAgentId: agentId,
+      activeGroupId: groupId,
+      activeTopicId: topicId,
+      internal_updateThreadLoading,
+      summaryThreadTitle,
+    } = this.#get();
+
+    if (!agentId || !topicId) return;
+
+    internal_updateThreadLoading(id, true);
+    try {
+      const messages = await messageService.getMessages({
+        agentId,
+        groupId,
+        threadId: id,
+        topicId,
+      });
+      await summaryThreadTitle(id, messages);
+    } finally {
+      internal_updateThreadLoading(id, false);
+    }
+  };
+
   summaryThreadTitle = async (threadId: string, messages: UIChatMessage[]): Promise<void> => {
     const { internal_updateThreadTitleInSummary, internal_updateThreadLoading } = this.#get();
-    const portalThread = threadSelectors.currentPortalThread(this.#get());
-    if (!portalThread) return;
+    const thread = threadSelectors
+      .currentTopicThreads(this.#get())
+      .find((item) => item.id === threadId);
+    if (!thread) return;
 
     internal_updateThreadTitleInSummary(threadId, LOADING_FLAT);
 
@@ -193,7 +221,7 @@ export class ChatThreadActionImpl {
 
     await chatService.fetchPresetTaskResult({
       onError: () => {
-        internal_updateThreadTitleInSummary(threadId, portalThread.title);
+        internal_updateThreadTitleInSummary(threadId, thread.title);
       },
       onFinish: async (text) => {
         await this.#get().internal_updateThread(threadId, { title: text });

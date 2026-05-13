@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { mutate } from '@/libs/swr';
 import { chatService } from '@/services/chat';
+import { messageService } from '@/services/message';
 import { threadService } from '@/services/thread';
 import { type ThreadItem } from '@/types/topic';
 import { ThreadStatus, ThreadType } from '@/types/topic';
@@ -42,6 +43,12 @@ vi.mock('@/services/thread', () => ({
 vi.mock('@/services/chat', () => ({
   chatService: {
     fetchPresetTaskResult: vi.fn(),
+  },
+}));
+
+vi.mock('@/services/message', () => ({
+  messageService: {
+    getMessages: vi.fn(),
   },
 }));
 
@@ -560,6 +567,55 @@ describe('thread action', () => {
     });
   });
 
+  describe('autoRenameThreadTitle', () => {
+    it('should fetch thread messages and summarize title', async () => {
+      const { result } = renderHook(() => useChatStore());
+
+      const threadMessages: UIChatMessage[] = [
+        {
+          agentId: 'test-session-id',
+          content: 'hello',
+          createdAt: Date.now(),
+          id: 'msg-1',
+          role: 'user',
+          updatedAt: Date.now(),
+        },
+      ];
+
+      (messageService.getMessages as Mock).mockResolvedValue(threadMessages);
+      const summarySpy = vi
+        .spyOn(result.current, 'summaryThreadTitle')
+        .mockResolvedValue(undefined);
+
+      await act(async () => {
+        await result.current.autoRenameThreadTitle('thread-id');
+      });
+
+      expect(messageService.getMessages).toHaveBeenCalledWith({
+        agentId: 'test-session-id',
+        groupId: undefined,
+        threadId: 'thread-id',
+        topicId: 'test-topic-id',
+      });
+      expect(summarySpy).toHaveBeenCalledWith('thread-id', threadMessages);
+      expect(result.current.threadLoadingIds).not.toContain('thread-id');
+    });
+
+    it('should not run when active agent or topic is missing', async () => {
+      const { result } = renderHook(() => useChatStore());
+
+      act(() => {
+        useChatStore.setState({ activeAgentId: undefined, activeTopicId: undefined });
+      });
+
+      await act(async () => {
+        await result.current.autoRenameThreadTitle('thread-id');
+      });
+
+      expect(messageService.getMessages).not.toHaveBeenCalled();
+    });
+  });
+
   describe('summaryThreadTitle', () => {
     it('should generate and update thread title via AI', async () => {
       const { result } = renderHook(() => useChatStore());
@@ -701,12 +757,13 @@ describe('thread action', () => {
       expect(chatService.fetchPresetTaskResult).toHaveBeenCalled();
     });
 
-    it('should not run if no portal thread found', async () => {
+    it('should not run if thread not found', async () => {
       const { result } = renderHook(() => useChatStore());
 
       act(() => {
         useChatStore.setState({
-          portalThreadId: undefined,
+          activeTopicId: 'test-topic-id',
+          threadMaps: {},
         });
       });
 

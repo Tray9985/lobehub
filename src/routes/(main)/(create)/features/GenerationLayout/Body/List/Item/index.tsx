@@ -22,6 +22,7 @@ interface TopicItemProps {
 const TopicItem = memo<TopicItemProps>(({ topic, style }) => {
   const { useStore, namespace } = useGenerationTopicContext();
   const { t } = useTranslation(namespace);
+  const { t: tTopic } = useTranslation('topic');
   const { modal } = App.useApp();
   const isLoading = useStore((s) => s.loadingGenerationTopicIds.includes(topic.id));
   const autoRenameGenerationTopicTitle = useStore((s) => s.autoRenameGenerationTopicTitle);
@@ -40,7 +41,7 @@ const TopicItem = memo<TopicItemProps>(({ topic, style }) => {
     {
       icon: <Icon icon={Wand2} />,
       key: 'autoRename',
-      label: t('actions.autoRename', { ns: 'topic' }),
+      label: tTopic('actions.autoRename'),
       onClick: () => {
         autoRenameGenerationTopicTitle(topic.id);
       },
