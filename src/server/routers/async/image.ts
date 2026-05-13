@@ -1,4 +1,3 @@
-import { ASYNC_TASK_TIMEOUT } from '@lobechat/business-config/server';
 import { ENABLE_BUSINESS_FEATURES } from '@lobechat/business-const';
 import {
   buildMappedBusinessModelFields,
@@ -33,6 +32,7 @@ import { getContentPolicyErrorMessage } from './contentPolicyError';
 
 const log = debug('lobe-image:async');
 
+const IMAGE_GENERATION_TASK_TIMEOUT = 6 * 60 * 1000;
 const IMAGE_URL_PREVIEW_LENGTH = 100;
 
 const imageProcedure = asyncAuthedProcedure.use(async (opts) => {
@@ -425,7 +425,7 @@ export const imageRouter = router({
         timeoutId = setTimeout(() => {
           log('Image generation timeout, aborting operation: %s', taskId);
           abortController.abort();
-        }, ASYNC_TASK_TIMEOUT);
+        }, IMAGE_GENERATION_TASK_TIMEOUT);
 
         const result = await imageGenerationPromise(abortController.signal);
 
