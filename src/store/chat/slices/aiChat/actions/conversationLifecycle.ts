@@ -326,6 +326,8 @@ export class ConversationLifecycleActionImpl {
       message,
       selectedTools,
     });
+    const requestTrigger = (metadata as Pick<MessageMetadata, 'trigger'> | undefined)?.trigger;
+    const requestMetadata = requestTrigger ? { trigger: requestTrigger } : undefined;
 
     const hasFile = !!fileIdList && fileIdList.length > 0;
 
@@ -983,6 +985,7 @@ export class ConversationLifecycleActionImpl {
           await executeClientAgent({
             context: execContext,
             initialContext: mergedAgentRuntimeInitialContext,
+            metadata: requestMetadata,
             onFinish: data.isCreateNewTopic
               ? async () => {
                   const topicId = data.topicId;
