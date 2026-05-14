@@ -62,11 +62,8 @@ vi.mock('@/utils/logger', () => ({
   }),
 }));
 
-// Mock updater configs
-vi.mock('@/modules/updater/configs', () => ({
-  UPDATE_CHANNEL: 'stable',
-  UPDATE_SERVER_URL: 'https://mock.update.server',
-  updaterConfig: {
+const { mockUpdaterConfig } = vi.hoisted(() => ({
+  mockUpdaterConfig: {
     app: {
       autoCheckUpdate: false,
       autoDownloadUpdate: true,
@@ -74,6 +71,13 @@ vi.mock('@/modules/updater/configs', () => ({
     },
     enableAppUpdate: true,
   },
+}));
+
+// Mock updater configs
+vi.mock('@/modules/updater/configs', () => ({
+  UPDATE_CHANNEL: 'stable',
+  UPDATE_SERVER_URL: 'https://mock.update.server',
+  updaterConfig: mockUpdaterConfig,
 }));
 
 // Mock env
@@ -97,6 +101,8 @@ describe('UpdaterManager', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    mockUpdaterConfig.enableAppUpdate = true;
+    mockUpdaterConfig.app.autoCheckUpdate = false;
 
     // Reset autoUpdater state
     (autoUpdater as any).autoDownload = false;
@@ -180,6 +186,18 @@ describe('UpdaterManager', () => {
       await updaterManager.checkForUpdates();
 
       expect(autoUpdater.checkForUpdates).toHaveBeenCalled();
+    });
+
+    it('should skip check when app updates are disabled', async () => {
+      mockUpdaterConfig.enableAppUpdate = false;
+
+      await updaterManager.checkForUpdates();
+
+      expect(autoUpdater.checkForUpdates).not.toHaveBeenCalled();
+      expect(mockBroadcast).not.toHaveBeenCalledWith(
+        'updaterStateChanged',
+        expect.objectContaining({ stage: 'checking' }),
+      );
     });
 
     it('should broadcast updaterStateChanged with checking stage when checking', async () => {

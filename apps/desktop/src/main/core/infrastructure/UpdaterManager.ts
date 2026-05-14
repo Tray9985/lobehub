@@ -163,6 +163,11 @@ export class UpdaterManager {
    * Check for updates
    */
   public checkForUpdates = async ({ manual = false }: { manual?: boolean } = {}) => {
+    if (!updaterConfig.enableAppUpdate) {
+      logger.info('App updates are disabled, skipping update check');
+      return;
+    }
+
     if (this.checking || this.downloading) return;
 
     this.checking = true;

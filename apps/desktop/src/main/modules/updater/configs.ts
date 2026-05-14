@@ -1,6 +1,5 @@
 import type { UpdateChannel } from '@lobechat/electron-client-ipc';
 
-import { isDev } from '@/const/env';
 import { getDesktopEnv } from '@/env';
 
 // Build-time default channel, can be overridden at runtime via store
@@ -20,9 +19,9 @@ export const UPDATE_SERVER_URL = getDesktopEnv().UPDATE_SERVER_URL;
 
 export const updaterConfig = {
   app: {
-    autoCheckUpdate: true,
+    autoCheckUpdate: false,
     autoDownloadUpdate: true,
     checkUpdateInterval: 60 * 60 * 1000, // 1 hour
   },
-  enableAppUpdate: !isDev,
+  enableAppUpdate: false,
 };
