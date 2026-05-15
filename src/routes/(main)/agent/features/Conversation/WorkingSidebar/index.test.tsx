@@ -161,6 +161,9 @@ vi.mock('@/store/agent/selectors', () => ({
       (state: { agentWorkingDirectoryById?: Record<string, string | undefined> }) =>
         state.agentWorkingDirectoryById?.[agentId],
   },
+  agentSelectors: {
+    isCurrentAgentHeterogeneous: (_state: Record<string, unknown>) => false,
+  },
   chatConfigByIdSelectors: {
     isLocalSystemEnabledById: (_agentId: string) => (_state: Record<string, unknown>) => true,
   },

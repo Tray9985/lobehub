@@ -19,7 +19,8 @@ import MessengerBanner, { MESSENGER_BANNER_ID } from './MessengerBanner';
 import SkillInstallBanner, { SKILL_INSTALL_BANNER_ID } from './SkillInstallBanner';
 import { useSend } from './useSend';
 
-const leftActions: ActionKeys[] = ['model', 'search', 'fileUpload', 'tools'];
+const leftActions: ActionKeys[] = ['agentMode', 'plus'];
+const rightActions: ActionKeys[] = ['modelLabel'];
 
 type BannerKind = 'skill' | 'botIntegration' | 'messenger';
 
@@ -125,6 +126,7 @@ const InputArea = () => {
             agentId={agentId}
             allowExpand={false}
             leftActions={leftActions}
+            rightActions={rightActions}
             slashPlacement="bottom"
             chatInputEditorRef={(instance) => {
               if (!instance) return;

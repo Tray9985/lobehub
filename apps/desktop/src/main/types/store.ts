@@ -23,6 +23,7 @@ export interface ElectronMainStore {
   gatewayEnabled: boolean;
   gatewayUrl: string;
   locale: string;
+  localFileWorkspaceRoots: string[];
   networkProxy: NetworkProxySettings;
   shortcuts: Record<string, string>;
   storagePath: string;
