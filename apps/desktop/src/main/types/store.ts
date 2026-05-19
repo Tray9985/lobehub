@@ -25,6 +25,7 @@ export interface ElectronMainStore {
   locale: string;
   localFileWorkspaceRoots: string[];
   networkProxy: NetworkProxySettings;
+  pendingRestoreRoute: string;
   shortcuts: Record<string, string>;
   storagePath: string;
   themeMode: 'dark' | 'light' | 'system';
