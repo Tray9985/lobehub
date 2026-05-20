@@ -3,6 +3,7 @@ import { HotkeyEnum, KeyEnum } from '@lobechat/const/hotkeys';
 import { HETEROGENEOUS_TYPE_LABELS } from '@lobechat/heterogeneous-agents';
 import { chainInputCompletion, escapeXmlAttr } from '@lobechat/prompts';
 import { isCommandPressed, merge } from '@lobechat/utils';
+import type { IEditor } from '@lobehub/editor';
 import { INSERT_MENTION_COMMAND, ReactAutoCompletePlugin, ReactMathPlugin } from '@lobehub/editor';
 import { Editor, FloatMenu, useEditorState } from '@lobehub/editor/react';
 import { combineKeys } from '@lobehub/ui';
@@ -26,6 +27,7 @@ import {
 } from '@/store/user/selectors';
 
 import { useAgentId } from '../hooks/useAgentId';
+import { useChatInputDraft } from '../hooks/useChatInputDraft';
 import { useChatInputStore, useStoreApi } from '../store';
 import {
   INSERT_ACTION_TAG_COMMAND,
@@ -78,6 +80,8 @@ const InputEditor = memo<{
   ]);
 
   const storeApi = useStoreApi();
+  const { restoreDraft, saveDraftDebounced } = useChatInputDraft();
+  const restoredDraftEditorRef = useRef<IEditor | null>(null);
   const state = useEditorState(editor);
   const hotkey = useUserStore(settingsSelectors.getHotkeyById(HotkeyEnum.AddUserMessage));
   const { enableScope, disableScope } = useHotkeysContext();
@@ -327,6 +331,27 @@ const InputEditor = memo<{
       : { plugins };
   }, [enableRichRender, expand, slashMenuRef, autoCompletePlugin]);
 
+  const handleEditorInit = useCallback(
+    (editor: IEditor) => {
+      const saved = storeApi.getState()._savedEditorState;
+      storeApi.setState({ _savedEditorState: undefined, editor });
+      if (saved) {
+        requestAnimationFrame(() => {
+          editor.setDocument('json', saved);
+        });
+        return;
+      }
+
+      if (restoredDraftEditorRef.current === editor) return;
+      restoredDraftEditorRef.current = editor;
+
+      requestAnimationFrame(() => {
+        restoreDraft(editor);
+      });
+    },
+    [restoreDraft, storeApi],
+  );
+
   return (
     <Editor
       autoFocus
@@ -353,11 +378,14 @@ const InputEditor = memo<{
         minHeight: defaultRows > 1 ? defaultRows * 23 : undefined,
       }}
       onCompositionEnd={({ event }) => compositionProps.onCompositionEnd(event)}
+      onInit={handleEditorInit}
       onBlur={() => {
         disableScope(HotkeyEnum.AddUserMessage);
+        saveDraftDebounced.flush();
       }}
       onChange={() => {
         updateMarkdownContent();
+        saveDraftDebounced();
       }}
       onCompositionStart={({ event }) => {
         compositionProps.onCompositionStart(event);
@@ -384,15 +412,6 @@ const InputEditor = memo<{
       }}
       onFocus={() => {
         enableScope(HotkeyEnum.AddUserMessage);
-      }}
-      onInit={(editor) => {
-        const saved = storeApi.getState()._savedEditorState;
-        storeApi.setState({ _savedEditorState: undefined, editor });
-        if (saved) {
-          requestAnimationFrame(() => {
-            editor.setDocument('json', saved);
-          });
-        }
       }}
       onPressEnter={({ event: e }) => {
         if (e.shiftKey || isComposingRef.current) return;
