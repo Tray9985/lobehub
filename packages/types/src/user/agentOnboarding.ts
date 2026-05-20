@@ -8,12 +8,7 @@ export const SAVE_USER_QUESTION_FIELDS = [
   'customInterests',
 ] as const;
 
-export const AGENT_ONBOARDING_STRUCTURED_FIELDS = [
-  'agentEmoji',
-  'agentName',
-  'fullName',
-  'interests',
-] as const;
+export const AGENT_ONBOARDING_STRUCTURED_FIELDS = ['agentEmoji', 'agentName', 'fullName'] as const;
 
 export type SaveUserQuestionField = (typeof SAVE_USER_QUESTION_FIELDS)[number];
 export type AgentOnboardingStructuredField = (typeof AGENT_ONBOARDING_STRUCTURED_FIELDS)[number];
@@ -138,8 +133,8 @@ export const ONBOARDING_PHASES = [
   'summary',
 ] as const;
 
-export const MIN_DISCOVERY_USER_MESSAGES = 2;
-export const RECOMMENDED_DISCOVERY_USER_MESSAGES = 3;
+export const MIN_DISCOVERY_USER_MESSAGES = 1;
+export const RECOMMENDED_DISCOVERY_USER_MESSAGES = 1;
 
 export type OnboardingPhase = (typeof ONBOARDING_PHASES)[number];
 

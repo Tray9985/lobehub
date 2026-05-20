@@ -15,6 +15,7 @@ import {
 import { LobeActivatorIdentifier } from '@lobechat/builtin-tool-activator';
 import { CredsIdentifier, type CredSummary, generateCredsList } from '@lobechat/builtin-tool-creds';
 import { LocalSystemManifest } from '@lobechat/builtin-tool-local-system';
+import { BRANDING_PROVIDER } from '@lobechat/business-const';
 import {
   AGENT_DOCUMENT_INJECTION_POSITIONS,
   type AgentContextDocument,
@@ -148,6 +149,11 @@ const buildExternalPostProcessUrl = (ctx: Pick<RuntimeExecutorContext, 'serverDB
 
 const shouldRetryLLM = (kind: LLMErrorKind, attempt: number, maxRetries: number) =>
   kind === 'retry' && attempt <= maxRetries;
+
+const resolveLLMMaxRetries = (provider: string) =>
+  // The branded provider already routes through its own fallback chain. Retrying
+  // again here multiplies the same failed routed request across every channel.
+  provider === BRANDING_PROVIDER ? 0 : LLM_MAX_RETRIES;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -794,7 +800,8 @@ export const createRuntimeExecutors = (
         }
       };
 
-      const maxAttempts = LLM_MAX_RETRIES + 1;
+      const llmMaxRetries = resolveLLMMaxRetries(provider);
+      const maxAttempts = llmMaxRetries + 1;
 
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         let content = '';
@@ -1147,7 +1154,7 @@ export const createRuntimeExecutors = (
           const classified = classifyLLMError(error);
           const interrupted = await isOperationInterrupted(ctx);
 
-          if (!interrupted && shouldRetryLLM(classified.kind, attempt, LLM_MAX_RETRIES)) {
+          if (!interrupted && shouldRetryLLM(classified.kind, attempt, llmMaxRetries)) {
             const delayMs = getLLMRetryDelayMs(attempt);
 
             log(
@@ -1533,7 +1540,9 @@ export const createRuntimeExecutors = (
         typeof chatToolPayload.arguments === 'string'
           ? JSON.parse(chatToolPayload.arguments)
           : (chatToolPayload.arguments ?? {});
-    } catch {}
+    } catch {
+      // Keep malformed tool arguments as an empty preview payload; execution still uses raw args.
+    }
 
     try {
       // Check if this is a client-side function tool — pause instead of executing
@@ -2054,7 +2063,9 @@ export const createRuntimeExecutors = (
             typeof chatToolPayload.arguments === 'string'
               ? JSON.parse(chatToolPayload.arguments)
               : (chatToolPayload.arguments ?? {});
-        } catch {}
+        } catch {
+          // Keep malformed tool arguments as an empty preview payload; execution still uses raw args.
+        }
 
         try {
           log(`[${operationLogId}] Executing tool ${toolName} ...`);
