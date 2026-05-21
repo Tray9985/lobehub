@@ -13,7 +13,7 @@ RUN set -e && \
         sed -i "s/deb.debian.org/mirrors.ustc.edu.cn/g" "/etc/apt/sources.list.d/debian.sources"; \
     fi && \
     apt update && \
-    apt install ca-certificates proxychains-ng -qy && \
+    apt install ca-certificates git proxychains-ng -qy && \
     mkdir -p /distroless/bin /distroless/etc /distroless/etc/ssl/certs /distroless/lib && \
     cp /usr/lib/$(arch)-linux-gnu/libproxychains.so.4 /distroless/lib/libproxychains.so.4 && \
     cp /usr/lib/$(arch)-linux-gnu/libdl.so.2 /distroless/lib/libdl.so.2 && \
@@ -80,7 +80,6 @@ COPY patches ./patches
 # bring in desktop workspace manifest so pnpm can resolve it
 COPY apps/desktop/src/main/package.json ./apps/desktop/src/main/package.json
 
-# Skip git hooks during dependency install
 RUN set -e && \
     if [ "${USE_CN_MIRROR:-false}" = "true" ]; then \
         export SENTRYCLI_CDNURL="https://npmmirror.com/mirrors/sentry-cli"; \
@@ -91,7 +90,7 @@ RUN set -e && \
     npm i -g corepack@latest && \
     corepack enable && \
     corepack use $(sed -n 's/.*"packageManager": "\(.*\)".*/\1/p' package.json) && \
-    HUSKY=0 pnpm i && \
+    pnpm i && \
     mkdir -p /deps && \
     cd /deps && \
     echo '{"name":"deps","private":true}' > package.json && \
