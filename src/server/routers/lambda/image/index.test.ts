@@ -14,6 +14,7 @@ const {
   mockAsyncTaskModelUpdate,
   mockChargeBeforeGenerate,
   mockCreateAsyncCaller,
+  mockLoadModels,
   mockResolveBusinessModelMapping,
 } = vi.hoisted(() => ({
   mockServerDB: {
@@ -26,6 +27,7 @@ const {
   mockAsyncTaskModelUpdate: vi.fn(),
   mockChargeBeforeGenerate: vi.fn(),
   mockCreateAsyncCaller: vi.fn(),
+  mockLoadModels: vi.fn(),
   mockResolveBusinessModelMapping: vi.fn(),
 }));
 
@@ -65,6 +67,10 @@ vi.mock('@lobechat/business-model-runtime', async (importOriginal) => ({
   ...((await importOriginal()) as any),
   resolveBusinessModelMapping: (...args: [string, string]) =>
     mockResolveBusinessModelMapping(...args),
+}));
+
+vi.mock('@lobechat/business-model-bank/model-config', () => ({
+  loadModels: mockLoadModels,
 }));
 
 // Mock async caller
@@ -128,6 +134,15 @@ describe('imageRouter', () => {
     mockGetExternalFileUrls.mockImplementation(async (urls: string[]) =>
       urls.map((url) => `public:${url}`),
     );
+    mockLoadModels.mockResolvedValue([
+      {
+        abilities: {},
+        enabled: true,
+        id: 'gpt-image-1',
+        providerId: 'lobehub',
+        type: 'image',
+      },
+    ]);
 
     // Setup default transaction mock
     const mockBatch = {
