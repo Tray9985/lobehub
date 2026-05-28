@@ -2,10 +2,10 @@
 
 import type { MenuProps } from '@lobehub/ui';
 import { Icon } from '@lobehub/ui';
-import { App } from 'antd';
+import { confirmModal } from '@lobehub/ui/base-ui';
 import { PencilLine, Trash, Wand2 } from 'lucide-react';
 import type { CSSProperties } from 'react';
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { openRenameModal } from '@/components/RenameModal';
@@ -23,7 +23,7 @@ const TopicItem = memo<TopicItemProps>(({ topic, style }) => {
   const { useStore, namespace } = useGenerationTopicContext();
   const { t } = useTranslation(namespace);
   const { t: tTopic } = useTranslation('topic');
-  const { modal } = App.useApp();
+  const [isUpdating, setIsUpdating] = useState(false);
   const isLoading = useStore((s) => s.loadingGenerationTopicIds.includes(topic.id));
   const autoRenameGenerationTopicTitle = useStore((s) => s.autoRenameGenerationTopicTitle);
   const removeGenerationTopic = useStore((s) => s.removeGenerationTopic);
@@ -70,17 +70,19 @@ const TopicItem = memo<TopicItemProps>(({ topic, style }) => {
       key: 'delete',
       label: t('delete', { ns: 'common' }),
       onClick: () => {
-        modal.confirm({
+        confirmModal({
           cancelText: t('cancel', { ns: 'common' }),
           content: t('topic.deleteConfirmDesc'),
           okButtonProps: { danger: true },
           okText: t('delete', { ns: 'common' }),
           onOk: async () => {
+            setIsUpdating(true);
             try {
               await removeGenerationTopic(topic.id);
             } catch (error) {
               console.error('Delete topic failed:', error);
             }
+            setIsUpdating(false);
           },
           title: t('topic.deleteConfirm'),
         });
