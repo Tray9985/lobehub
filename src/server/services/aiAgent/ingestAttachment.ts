@@ -164,8 +164,9 @@ export async function ingestAttachment(
   const pathname = `files/${userId}/${nanoid()}/${source.name || `file.${ext}`}`;
   const { fileId, key } = await fileService.uploadFromBuffer(buffer, mimeType, pathname);
 
-  // 5. Resolve outbound URL for images and videos sent to external LLMs/providers.
-  const resolvedUrl = isImage || isVideo ? await fileService.getExternalFileUrl(key) : '';
+  // 5. Resolve access URL for images and videos.
+  const resolvedUrl =
+    isImage || isVideo ? await fileService.getFileAccessUrl({ id: fileId, url: key }) : '';
 
   log(
     'ingestAttachment: uploaded fileId=%s, key=%s, resolvedUrl=%s',

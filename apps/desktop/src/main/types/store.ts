@@ -1,5 +1,6 @@
 import type {
   DataSyncConfig,
+  ImessageBridgeConfig,
   NetworkProxySettings,
   UpdateChannel,
 } from '@lobechat/electron-client-ipc';
@@ -22,6 +23,7 @@ export interface ElectronMainStore {
   gatewayDeviceName: string;
   gatewayEnabled: boolean;
   gatewayUrl: string;
+  imessageBridgeConfigs: ImessageBridgeConfig[];
   locale: string;
   localFileWorkspaceRoots: string[];
   networkProxy: NetworkProxySettings;

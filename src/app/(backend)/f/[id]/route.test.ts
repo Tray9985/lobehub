@@ -1,15 +1,25 @@
 // @vitest-environment node
+import type { LobeChatDatabase } from '@lobechat/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FileModel } from '@/database/models/file';
+import type { FileItem } from '@/database/schemas';
 import { getServerDB } from '@/database/server';
 import { FileService } from '@/server/services/file';
 
 import { GET } from './route';
 
-const mocks = vi.hoisted(() => ({
-  getFullFileUrl: vi.fn(),
-}));
+const fileServiceMocks = vi.hoisted(() => {
+  const instance = {
+    createCachedPreSignedUrlForPreview: vi.fn(),
+    getFullFileUrl: vi.fn(),
+  };
+
+  return {
+    FileService: vi.fn(() => instance),
+    instance,
+  };
+});
 
 vi.mock('@/database/models/file', () => ({
   FileModel: {
@@ -21,54 +31,39 @@ vi.mock('@/database/server', () => ({
   getServerDB: vi.fn(),
 }));
 
-vi.mock('@/envs/redis', () => ({
-  getRedisConfig: vi.fn(() => ({})),
-}));
-
-vi.mock('@/libs/redis', () => ({
-  initializeRedis: vi.fn(),
-  isRedisEnabled: vi.fn(() => false),
-}));
-
 vi.mock('@/server/services/file', () => ({
-  FileService: vi.fn(() => ({
-    getFullFileUrl: mocks.getFullFileUrl,
-  })),
+  FileService: fileServiceMocks.FileService,
 }));
 
-describe('GET /f/:id', () => {
+describe('file proxy route', () => {
+  const db = {} as LobeChatDatabase;
+
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getServerDB).mockResolvedValue({} as any);
-    mocks.getFullFileUrl.mockResolvedValue('https://resource.example.com/files/test.png');
-  });
 
-  it('redirects to the public file URL', async () => {
+    vi.mocked(getServerDB).mockResolvedValue(db);
     vi.mocked(FileModel.getFileById).mockResolvedValue({
       id: 'file-id',
-      url: 'files/test.png',
-      userId: 'user-id',
-    } as any);
+      url: 'files/user-id/image.png',
+      userId: 'owner-user-id',
+    } as FileItem);
+    fileServiceMocks.instance.createCachedPreSignedUrlForPreview.mockResolvedValue(
+      'https://s3.example.com/presigned-preview-url',
+    );
+  });
 
+  it('should redirect to a cached presigned preview URL instead of a public full file URL', async () => {
     const response = await GET(new Request('https://lobehub.com/f/file-id'), {
       params: Promise.resolve({ id: 'file-id' }),
     });
 
-    expect(FileModel.getFileById).toHaveBeenCalledWith(expect.anything(), 'file-id');
-    expect(FileService).toHaveBeenCalledWith(expect.anything(), 'user-id');
-    expect(mocks.getFullFileUrl).toHaveBeenCalledWith('files/test.png');
     expect(response.status).toBe(302);
-    expect(response.headers.get('location')).toBe('https://resource.example.com/files/test.png');
-  });
-
-  it('returns 404 when file record is missing', async () => {
-    vi.mocked(FileModel.getFileById).mockResolvedValue(undefined);
-
-    const response = await GET(new Request('https://lobehub.com/f/missing'), {
-      params: Promise.resolve({ id: 'missing' }),
-    });
-
-    expect(response.status).toBe(404);
-    expect(mocks.getFullFileUrl).not.toHaveBeenCalled();
+    expect(response.headers.get('location')).toBe('https://s3.example.com/presigned-preview-url');
+    expect(FileModel.getFileById).toHaveBeenCalledWith(db, 'file-id');
+    expect(FileService).toHaveBeenCalledWith(db, 'owner-user-id');
+    expect(fileServiceMocks.instance.createCachedPreSignedUrlForPreview).toHaveBeenCalledWith(
+      'files/user-id/image.png',
+    );
+    expect(fileServiceMocks.instance.getFullFileUrl).not.toHaveBeenCalled();
   });
 });

@@ -8,11 +8,18 @@ import { FileModel } from '@/database/models/file';
 import { type FileItem } from '@/database/schemas';
 import { appEnv } from '@/envs/app';
 import { TempFileManager } from '@/server/utils/tempFileManager';
+import { isDev } from '@/utils/env';
 
 import { createFileServiceModule } from './impls';
 import { type FileServiceImpl } from './impls/type';
 
-const EXTERNAL_FILE_URL_EXPIRE_IN = 60 * 60;
+export const getFileProxyUrl = (fileId: string): string => `${appEnv.APP_URL}/f/${fileId}`;
+
+export interface FileAccessUrlItem {
+  fileId?: string | null;
+  id?: string | null;
+  url?: string | null;
+}
 
 /**
  * File service class
@@ -83,47 +90,13 @@ export class FileService {
   }
 
   /**
-   * Resolve file references for outbound provider/LLM payloads.
-   * LobeHub managed files use the same public URL policy as UI previews;
-   * third-party URLs stay unchanged.
+   * Create cached pre-signed preview URL
    */
-  public async getExternalFileUrl(
+  public async createCachedPreSignedUrlForPreview(
     url?: string | null,
-    expiresIn: number = EXTERNAL_FILE_URL_EXPIRE_IN,
+    expiresIn?: number,
   ): Promise<string> {
-    if (!url) return '';
-
-    if (url.startsWith('data:')) return url;
-
-    if (url.startsWith('/f/')) {
-      const key = await this.getKeyFromFullUrl(new URL(url, appEnv.APP_URL).toString());
-      if (!key) throw new Error(`File key not found from proxy url: ${url}`);
-
-      return this.getFullFileUrl(key, expiresIn);
-    }
-
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      const urlObject = new URL(url);
-      const appUrl = new URL(appEnv.APP_URL);
-
-      if (urlObject.origin !== appUrl.origin) return url;
-
-      if (!urlObject.pathname.startsWith('/f/')) return url;
-
-      const key = await this.getKeyFromFullUrl(url);
-      if (!key) throw new Error(`File key not found from proxy url: ${url}`);
-
-      return this.getFullFileUrl(key, expiresIn);
-    }
-
-    return this.getFullFileUrl(url, expiresIn);
-  }
-
-  public async getExternalFileUrls(
-    urls: string[],
-    expiresIn: number = EXTERNAL_FILE_URL_EXPIRE_IN,
-  ): Promise<string[]> {
-    return Promise.all(urls.map((url) => this.getExternalFileUrl(url, expiresIn)));
+    return this.impl.createCachedPreSignedUrlForPreview(url, expiresIn);
   }
 
   /**
@@ -138,6 +111,21 @@ export class FileService {
    */
   public async getFullFileUrl(url?: string | null, expiresIn?: number): Promise<string> {
     return this.impl.getFullFileUrl(url, expiresIn);
+  }
+
+  /**
+   * Resolve a file URL for consumers that need to read the file.
+   * Production uses the stable file proxy URL; local development falls back to
+   * the storage URL so remote model providers can download local test files.
+   */
+  public async getFileAccessUrl(file: FileAccessUrlItem): Promise<string> {
+    const fileId = file.fileId || file.id;
+
+    if (!isDev && fileId) {
+      return getFileProxyUrl(fileId);
+    }
+
+    return this.getFullFileUrl(file.url);
   }
 
   /**
@@ -225,10 +213,9 @@ export class FileService {
       !isExist, // insertToGlobalFiles
     );
 
-    // Return unified proxy URL: ${APP_URL}/f/:id
     return {
       fileId: id,
-      url: `${appEnv.APP_URL}/f/${id}`,
+      url: await this.getFileAccessUrl({ id, url: params.url }),
     };
   }
 
