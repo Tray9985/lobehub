@@ -1,20 +1,19 @@
-import { Claude, Jimeng, OpenAI } from '@lobehub/icons';
-import { type ButtonProps } from '@lobehub/ui';
-import { Button, Center, Tag, Tooltip } from '@lobehub/ui';
+import { ModelIcon } from '@lobehub/icons';
+import { Button, Center, Skeleton, Tag } from '@lobehub/ui';
 import { App } from 'antd';
 import { createStaticStyles, cx } from 'antd-style';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { HomeNewModelItem } from '@/business/client/hooks/useHomeNewModels';
+import { useHomeNewModels } from '@/business/client/hooks/useHomeNewModels';
 import { useStableNavigate } from '@/hooks/useStableNavigate';
 import { agentService } from '@/services/agent';
 import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors } from '@/store/agent/selectors';
 
 import { useResolvedHomeAgentId } from '../AgentSelect/useResolvedHomeAgentId';
-import { CLAUDE_OPUS_4_8_MODEL, CLAUDE_OPUS_4_8_PROVIDER } from './starterModels';
-
-type StarterKey = 'claude-opus-4-8' | 'image' | 'video';
+import { DEFAULT_HOME_NEW_MODELS, NEW_CHAT_PROVIDER } from './starterModels';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
   button: css`
@@ -28,23 +27,18 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
       background: ${cssVar.colorBgElevated} !important;
     }
   `,
+  container: css`
+    flex-wrap: wrap;
+  `,
   newTag: css`
     padding-inline: 10px !important;
     border-radius: 999px !important;
   `,
 }));
 
-type StarterTitleKey =
-  | 'starter.claudeOpus48'
-  | 'starter.imageGeneration'
-  | 'starter.videoGeneration';
-
-interface StarterItem {
-  disabled?: boolean;
-  icon?: ButtonProps['icon'];
-  key: StarterKey;
-  titleKey: StarterTitleKey;
-}
+const getStarterItemKey = (item: HomeNewModelItem) => `${item.type}:${item.model}`;
+const getStarterItemProvider = (item: HomeNewModelItem) => item.provider ?? NEW_CHAT_PROVIDER;
+const skeletonWidths = [112, 150, 126, 138];
 
 const StarterList = memo(() => {
   const { t } = useTranslation('home');
@@ -52,44 +46,27 @@ const StarterList = memo(() => {
   const { message } = App.useApp();
   const { agentId: activeAgentId } = useResolvedHomeAgentId();
   const updateAgentConfigById = useAgentStore((s) => s.updateAgentConfigById);
-  const [switchingKey, setSwitchingKey] = useState<StarterKey | null>(null);
-
-  const items: StarterItem[] = useMemo(
-    () => [
-      {
-        icon: Claude.Avatar,
-        key: 'claude-opus-4-8',
-        titleKey: 'starter.claudeOpus48',
-      },
-      {
-        icon: OpenAI.Avatar,
-        key: 'image',
-        titleKey: 'starter.imageGeneration',
-      },
-      {
-        icon: Jimeng.Avatar,
-        key: 'video',
-        titleKey: 'starter.videoGeneration',
-      },
-    ],
-    [],
-  );
+  const [switchingKey, setSwitchingKey] = useState<string | null>(null);
+  const { isLoading, items } = useHomeNewModels(DEFAULT_HOME_NEW_MODELS);
 
   const handleClick = useCallback(
-    async (key: StarterKey) => {
-      if (key === 'video') {
-        navigate('/video?model=dreamina-seedance-2-0-260128');
+    async (item: HomeNewModelItem) => {
+      const key = getStarterItemKey(item);
+
+      if (item.type === 'video') {
+        navigate(`/video?model=${item.model}`);
         return;
       }
 
-      if (key === 'image') {
-        navigate('/image?model=gpt-image-2');
+      if (item.type === 'image') {
+        navigate(`/image?model=${item.model}`);
         return;
       }
 
-      if (key === 'claude-opus-4-8') {
+      if (item.type === 'chat') {
         if (!activeAgentId || switchingKey) return;
         setSwitchingKey(key);
+        const provider = getStarterItemProvider(item);
         try {
           // Hydrate the agent's config before mutating so the optimistic update
           // doesn't drop pre-existing fields the home input never loaded.
@@ -103,19 +80,16 @@ const StarterList = memo(() => {
           const currentModel = agentByIdSelectors.getAgentModelById(activeAgentId)(agentState);
           const currentProvider =
             agentByIdSelectors.getAgentModelProviderById(activeAgentId)(agentState);
-          if (
-            currentModel === CLAUDE_OPUS_4_8_MODEL &&
-            currentProvider === CLAUDE_OPUS_4_8_PROVIDER
-          ) {
-            message.info(t('starter.claudeOpus48Already'));
+          if (currentModel === item.model && currentProvider === provider) {
+            message.info(t('starter.modelInUse', { name: item.title }));
             return;
           }
 
           await updateAgentConfigById(activeAgentId, {
-            model: CLAUDE_OPUS_4_8_MODEL,
-            provider: CLAUDE_OPUS_4_8_PROVIDER,
+            model: item.model,
+            provider,
           });
-          message.success(t('starter.claudeOpus48Switched'));
+          message.success(t('starter.modelSwitched', { name: item.title }));
         } finally {
           setSwitchingKey(null);
         }
@@ -126,40 +100,41 @@ const StarterList = memo(() => {
   );
 
   return (
-    <Center horizontal gap={8}>
+    <Center horizontal className={styles.container} gap={8}>
       <Tag className={styles.newTag} size={'small'}>
         {t('starter.newLabel')}
       </Tag>
-      {items.map((item) => {
-        const isLoading = switchingKey === item.key;
-        const button = (
-          <Button
-            className={cx(styles.button)}
-            disabled={item.disabled || (!!switchingKey && !isLoading)}
-            icon={item.icon}
-            key={item.key}
-            loading={isLoading}
-            shape={'round'}
-            variant={'outlined'}
-            iconProps={{
-              size: 18,
-            }}
-            onClick={() => handleClick(item.key)}
-          >
-            {t(item.titleKey)}
-          </Button>
-        );
+      {isLoading
+        ? DEFAULT_HOME_NEW_MODELS.map((item, index) => (
+            <Skeleton.Button
+              active
+              key={getStarterItemKey(item)}
+              style={{
+                borderRadius: 999,
+                height: 40,
+                width: skeletonWidths[index] ?? 126,
+              }}
+            />
+          ))
+        : items.map((item) => {
+            const key = getStarterItemKey(item);
+            const isSwitching = switchingKey === key;
 
-        if (item.disabled) {
-          return (
-            <Tooltip key={item.key} title={t('starter.developing')}>
-              {button}
-            </Tooltip>
-          );
-        }
-
-        return button;
-      })}
+            return (
+              <Button
+                className={cx(styles.button)}
+                disabled={!!switchingKey && !isSwitching}
+                icon={<ModelIcon model={item.iconModel ?? item.model} size={18} />}
+                key={key}
+                loading={isSwitching}
+                shape={'round'}
+                variant={'outlined'}
+                onClick={() => handleClick(item)}
+              >
+                {item.title}
+              </Button>
+            );
+          })}
     </Center>
   );
 });
